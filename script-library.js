@@ -1,14 +1,30 @@
+// ============================================================
+// AUTO ADS LIBRARY
+// ATUALIZADO 30.08.2026
+// ============================================================
 
-//ATUALIZADO 15.06.2026
 (() => {
 
-    // Mata instalação anterior
+    // ========================================================
+    // MATA INSTALAÇÃO ANTERIOR
+    // ========================================================
+
     if (window.AUTO_ADS?.timer) {
         clearInterval(window.AUTO_ADS.timer);
     }
 
+    if (window.AUTO_ADS?.limitMonitor) {
+        clearInterval(window.AUTO_ADS.limitMonitor);
+    }
+
     document.getElementById("auto-ads-config-btn")?.remove();
+    document.getElementById("auto-ads-popup")?.remove();
     document.getElementById("auto-ads-toast")?.remove();
+
+
+    // ========================================================
+    // TOAST
+    // ========================================================
 
     const mostrarMensagem = (texto) => {
 
@@ -29,8 +45,9 @@
                 color: "#fff",
                 borderRadius: "8px",
                 fontSize: "14px",
-                fontFamily: "Arial",
-                boxShadow: "0 4px 12px rgba(0,0,0,.3)"
+                fontFamily: "Arial, sans-serif",
+                boxShadow: "0 4px 12px rgba(0,0,0,.3)",
+                transition: "opacity .2s"
             });
 
             document.body.appendChild(toast);
@@ -46,19 +63,160 @@
         }, 2500);
     };
 
+
+    // ========================================================
+    // AUTO ADS
+    // ========================================================
+
     window.AUTO_ADS = {
 
         timer: null,
 
+        limitMonitor: null,
+
         // velocidade padrão
         intervalo: 3000,
 
+        // limite padrão
+        limite: parseInt(
+            localStorage.getItem("autoAdsLimite") || "3000",
+            10
+        ),
+
+        // ----------------------------------------------------
+        // FORMATA NÚMEROS
+        // ----------------------------------------------------
+
+        formatarNumero(numero) {
+
+            return Number(numero).toLocaleString("pt-BR");
+
+        },
+
+        // ----------------------------------------------------
+        // LÊ O CONTADOR DO COPY ADS
+        // ----------------------------------------------------
+
+        obterQuantidadeAnuncios() {
+
+            const badge =
+                document.querySelector(
+                    "#filtered-ads-toggle-btn .ui-btn-badge"
+                );
+
+            if (!badge) {
+                return null;
+            }
+
+            const texto = (
+                badge.textContent ||
+                badge.innerText ||
+                ""
+            ).trim();
+
+            /*
+                Exemplos:
+
+                92/92
+                1.245/1.245
+                3.000/3.000
+                4000/4000
+
+                Pegamos o SEGUNDO número.
+            */
+
+            const match = texto.match(
+                /\/\s*([\d.,]+)/
+            );
+
+            if (!match) {
+                return null;
+            }
+
+            let numeroTexto = match[1]
+                .replace(/\./g, "")
+                .replace(/,/g, "");
+
+            const numero = parseInt(
+                numeroTexto,
+                10
+            );
+
+            if (isNaN(numero)) {
+                return null;
+            }
+
+            return numero;
+        },
+
+
+        // ----------------------------------------------------
+        // VERIFICA LIMITE
+        // ----------------------------------------------------
+
+        verificarLimite() {
+
+            const quantidade =
+                this.obterQuantidadeAnuncios();
+
+            if (quantidade === null) {
+                return false;
+            }
+
+            if (quantidade >= this.limite) {
+
+                if (this.timer) {
+
+                    clearInterval(this.timer);
+
+                    this.timer = null;
+
+                    mostrarMensagem(
+                        `🛑 Limite atingido: ${this.formatarNumero(quantidade)} anúncios`
+                    );
+
+                    console.log(
+                        "[AUTO ADS] Limite atingido:",
+                        quantidade,
+                        "de",
+                        this.limite
+                    );
+                }
+
+                return true;
+            }
+
+            return false;
+        },
+
+
+        // ----------------------------------------------------
+        // EXECUTA SCROLL + VER MAIS
+        // ----------------------------------------------------
+
         executar() {
+
+            // PRIMEIRA COISA:
+            // verifica se já chegou no limite
+
+            if (this.verificarLimite()) {
+                return;
+            }
+
+
+            // ------------------------------------------------
+            // SCROLL
+            // ------------------------------------------------
 
             window.scrollBy({
                 top: 1200,
                 behavior: "smooth"
             });
+
+
+            // ------------------------------------------------
+            // CLICA EM "VER MAIS"
+            // ------------------------------------------------
 
             document
                 .querySelectorAll(
@@ -68,517 +226,1348 @@
 
                     const texto = (
                         el.innerText || ""
-                    ).trim().toLowerCase();
+                    )
+                        .trim()
+                        .toLowerCase();
 
                     if (
                         texto === "ver mais" ||
                         texto.startsWith("ver mais") ||
                         texto.includes("ver mais")
                     ) {
+
                         try {
                             el.click();
                         } catch {}
                     }
+
                 });
         },
 
+
+        // ----------------------------------------------------
+        // INICIA
+        // ----------------------------------------------------
+
         iniciar() {
 
-            if (this.timer) {
-                mostrarMensagem(
-                    `Já rodando (${this.intervalo / 1000}s)`
-                );
+            // Segurança:
+            // se já estiver no limite, não inicia
+
+            if (this.verificarLimite()) {
                 return;
             }
 
+
+            if (this.timer) {
+
+                mostrarMensagem(
+                    `Já rodando (${this.intervalo / 1000}s)`
+                );
+
+                return;
+            }
+
+
             this.timer = setInterval(() => {
+
                 this.executar();
+
             }, this.intervalo);
 
+
             mostrarMensagem(
-                `🚀 Iniciado (${this.intervalo / 1000}s)`
+                `🚀 Iniciado (${this.intervalo / 1000}s) | Limite ${this.formatarNumero(this.limite)}`
             );
         },
+
+
+        // ----------------------------------------------------
+        // PARA
+        // ----------------------------------------------------
 
         parar() {
 
             if (!this.timer) {
-                mostrarMensagem("Já parado");
+
+                mostrarMensagem(
+                    "Já parado"
+                );
+
                 return;
             }
+
 
             clearInterval(this.timer);
 
             this.timer = null;
 
-            mostrarMensagem("🛑 Parado");
+
+            mostrarMensagem(
+                "🛑 Parado"
+            );
         },
+
+
+        // ----------------------------------------------------
+        // ALTERAR VELOCIDADE
+        // ----------------------------------------------------
 
         alterarVelocidade() {
 
-            const atual = this.intervalo / 1000;
+            const atual =
+                this.intervalo / 1000;
+
 
             const valor = prompt(
                 `Velocidade atual: ${atual}s\n\nDigite a nova velocidade em segundos:`,
                 atual
             );
 
-            if (valor === null) return;
 
-            const segundos = parseFloat(
-                valor.replace(",", ".")
-            );
+            if (valor === null) {
+                return;
+            }
+
+
+            const segundos =
+                parseFloat(
+                    valor.replace(",", ".")
+                );
+
 
             if (
                 isNaN(segundos) ||
                 segundos <= 0
             ) {
-                mostrarMensagem("❌ Valor inválido");
+
+                mostrarMensagem(
+                    "❌ Valor inválido"
+                );
+
                 return;
             }
 
-            this.intervalo = segundos * 1000;
 
-            const estavaRodando = !!this.timer;
+            this.intervalo =
+                segundos * 1000;
+
+
+            const estavaRodando =
+                !!this.timer;
+
 
             if (estavaRodando) {
 
-                clearInterval(this.timer);
+                clearInterval(
+                    this.timer
+                );
 
                 this.timer = null;
 
                 this.iniciar();
             }
 
+
             mostrarMensagem(
-                `⚡ Velocidade alterada para ${segundos}s`
+                `⚡ Velocidade: ${segundos}s`
             );
+
 
             console.log(
                 "[AUTO ADS] Intervalo atualizado:",
                 segundos,
                 "segundos"
             );
+        },
+
+
+        // ----------------------------------------------------
+        // CONVERTE 3K / 4K / 3000 ETC.
+        // ----------------------------------------------------
+
+        converterLimite(valor) {
+
+            if (!valor) {
+                return null;
+            }
+
+            let texto =
+                String(valor)
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\s/g, "")
+                    .replace(",", ".");
+
+
+            // 3k
+            if (texto.endsWith("k")) {
+
+                const numero =
+                    parseFloat(
+                        texto.slice(0, -1)
+                    );
+
+                if (
+                    isNaN(numero) ||
+                    numero <= 0
+                ) {
+                    return null;
+                }
+
+                return Math.round(
+                    numero * 1000
+                );
+            }
+
+
+            // 3000 / 4000 / 10000
+            texto =
+                texto.replace(/\./g, "");
+
+
+            const numero =
+                parseInt(
+                    texto,
+                    10
+                );
+
+
+            if (
+                isNaN(numero) ||
+                numero <= 0
+            ) {
+                return null;
+            }
+
+
+            return numero;
+        },
+
+
+        // ----------------------------------------------------
+        // ALTERAR LIMITE
+        // ----------------------------------------------------
+
+        alterarLimite() {
+
+            const atual =
+                this.formatarNumero(
+                    this.limite
+                );
+
+
+            const valor = prompt(
+                `Limite atual: ${atual} anúncios\n\nDigite o novo limite:\n\nExemplos: 3000, 3k, 4k, 5000`,
+                atual
+            );
+
+
+            if (valor === null) {
+                return;
+            }
+
+
+            const novoLimite =
+                this.converterLimite(valor);
+
+
+            if (
+                novoLimite === null ||
+                novoLimite < 1
+            ) {
+
+                mostrarMensagem(
+                    "❌ Limite inválido"
+                );
+
+                return;
+            }
+
+
+            this.limite =
+                novoLimite;
+
+
+            localStorage.setItem(
+                "autoAdsLimite",
+                String(novoLimite)
+            );
+
+
+            atualizarTextoLimite();
+
+
+            mostrarMensagem(
+                `🔢 Limite definido: ${this.formatarNumero(novoLimite)}`
+            );
+
+
+            console.log(
+                "[AUTO ADS] Novo limite:",
+                novoLimite
+            );
+
+
+            // Se já estiver acima do novo limite,
+            // para imediatamente.
+
+            this.verificarLimite();
+        },
+
+
+        // ----------------------------------------------------
+        // MONITORAMENTO CONTÍNUO DO COPY ADS
+        // ----------------------------------------------------
+
+        iniciarMonitorLimite() {
+
+            if (this.limitMonitor) {
+                clearInterval(
+                    this.limitMonitor
+                );
+            }
+
+
+            /*
+                Verifica a cada 500ms.
+
+                Isso evita depender apenas do
+                intervalo de scroll de 3 segundos.
+            */
+
+            this.limitMonitor =
+                setInterval(() => {
+
+                    this.verificarLimite();
+
+                }, 500);
         }
+
     };
 
-    // Botão flutuante
-    const btn = document.createElement("div");
 
-    btn.id = "auto-ads-config-btn";
-    btn.innerHTML = "⚙";
+    // ========================================================
+    // POPUP
+    // ========================================================
 
-    Object.assign(btn.style, {
+    const popup =
+        document.createElement("div");
+
+    popup.id =
+        "auto-ads-popup";
+
+    Object.assign(popup.style, {
+
         position: "fixed",
-        bottom: "20px",
+        bottom: "80px",
         right: "20px",
-        width: "50px",
-        height: "50px",
-        borderRadius: "50%",
-        background: "#ff3b30",
+
+        width: "190px",
+
+        background: "#111",
         color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "24px",
-        cursor: "pointer",
+
+        borderRadius: "12px",
+
+        padding: "10px",
+
         zIndex: "2147483647",
-        boxShadow: "0 4px 12px rgba(0,0,0,.4)",
-        userSelect: "none"
+
+        boxShadow:
+            "0 6px 20px rgba(0,0,0,.4)",
+
+        fontFamily:
+            "Arial, sans-serif",
+
+        display: "none",
+
+        boxSizing: "border-box"
+
     });
 
-    btn.title = "Alterar velocidade";
 
-    btn.addEventListener("click", () => {
-        window.AUTO_ADS.alterarVelocidade();
+    popup.innerHTML = `
+
+        <div style="
+            font-size:13px;
+            font-weight:bold;
+            margin-bottom:8px;
+            padding:2px 4px;
+        ">
+            ⚙ Auto Ads
+        </div>
+
+        <button id="auto-ads-speed-btn">
+            ⚡ Velocidade
+        </button>
+
+        <button id="auto-ads-limit-btn">
+            🔢 Limite: ${window.AUTO_ADS.formatarNumero(window.AUTO_ADS.limite)}
+        </button>
+
+    `;
+
+
+    // ========================================================
+    // ESTILO DOS BOTÕES DO POPUP
+    // ========================================================
+
+    popup.querySelectorAll("button").forEach(button => {
+
+        Object.assign(button.style, {
+
+            width: "100%",
+
+            border: "none",
+
+            background: "#222",
+
+            color: "#fff",
+
+            padding: "9px 10px",
+
+            marginBottom: "6px",
+
+            borderRadius: "7px",
+
+            cursor: "pointer",
+
+            fontSize: "12px",
+
+            textAlign: "left"
+
+        });
+
+
+        button.addEventListener(
+            "mouseenter",
+            () => {
+                button.style.background =
+                    "#333";
+            }
+        );
+
+
+        button.addEventListener(
+            "mouseleave",
+            () => {
+                button.style.background =
+                    "#222";
+            }
+        );
+
     });
 
-    document.body.appendChild(btn);
 
-    // Teclas de atalho
-    document.addEventListener("keydown", (e) => {
+    document.body.appendChild(
+        popup
+    );
 
-        const tecla = e.key.toLowerCase();
 
-        if (
-            ["input", "textarea"].includes(
-                document.activeElement?.tagName?.toLowerCase()
-            )
-        ) {
+    // ========================================================
+    // ATUALIZA TEXTO DO BOTÃO DE LIMITE
+    // ========================================================
+
+    function atualizarTextoLimite() {
+
+        const button =
+            document.getElementById(
+                "auto-ads-limit-btn"
+            );
+
+        if (!button) {
             return;
         }
 
-        if (tecla === "p") {
-            window.AUTO_ADS.parar();
-        }
+        button.textContent =
+            `🔢 Limite: ${window.AUTO_ADS.formatarNumero(window.AUTO_ADS.limite)}`;
+    }
 
-        if (tecla === "ç") {
-            window.AUTO_ADS.iniciar();
-        }
+
+    // ========================================================
+    // BOTÃO VELOCIDADE
+    // ========================================================
+
+    document
+        .getElementById("auto-ads-speed-btn")
+        .addEventListener("click", () => {
+
+            window.AUTO_ADS.alterarVelocidade();
+
+        });
+
+
+    // ========================================================
+    // BOTÃO LIMITE
+    // ========================================================
+
+    document
+        .getElementById("auto-ads-limit-btn")
+        .addEventListener("click", () => {
+
+            window.AUTO_ADS.alterarLimite();
+
+        });
+
+
+    // ========================================================
+    // BOTÃO FLUTUANTE
+    // ========================================================
+
+    const btn =
+        document.createElement("div");
+
+    btn.id =
+        "auto-ads-config-btn";
+
+    btn.innerHTML =
+        "⚙";
+
+
+    Object.assign(btn.style, {
+
+        position: "fixed",
+
+        bottom: "20px",
+        right: "20px",
+
+        width: "50px",
+        height: "50px",
+
+        borderRadius: "50%",
+
+        background: "#ff3b30",
+
+        color: "#fff",
+
+        display: "flex",
+
+        alignItems: "center",
+        justifyContent: "center",
+
+        fontSize: "24px",
+
+        cursor: "pointer",
+
+        zIndex: "2147483647",
+
+        boxShadow:
+            "0 4px 12px rgba(0,0,0,.4)",
+
+        userSelect: "none"
 
     });
 
+
+    btn.title =
+        "Configurações";
+
+
+    btn.addEventListener(
+        "click",
+        (e) => {
+
+            e.stopPropagation();
+
+            popup.style.display =
+                popup.style.display === "none"
+                    ? "block"
+                    : "none";
+
+        }
+    );
+
+
+    document.body.appendChild(
+        btn
+    );
+
+
+    // ========================================================
+    // FECHA POPUP AO CLICAR FORA
+    // ========================================================
+
+    document.addEventListener(
+        "click",
+        (e) => {
+
+            if (
+                !popup.contains(e.target) &&
+                e.target !== btn
+            ) {
+
+                popup.style.display =
+                    "none";
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // TECLAS DE ATALHO
+    // ========================================================
+
+    document.addEventListener(
+        "keydown",
+        (e) => {
+
+            const tecla =
+                e.key.toLowerCase();
+
+
+            if (
+                ["input", "textarea"].includes(
+                    document.activeElement?.tagName?.toLowerCase()
+                )
+            ) {
+                return;
+            }
+
+
+            if (tecla === "p") {
+
+                window.AUTO_ADS.parar();
+
+            }
+
+
+            if (tecla === "ç") {
+
+                window.AUTO_ADS.iniciar();
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // INICIA MONITORAMENTO DO LIMITE
+    // ========================================================
+
+    window.AUTO_ADS.iniciarMonitorLimite();
+
+
     mostrarMensagem(
-        "Ativado | Ç iniciar | P parar | ⚙ velocidade"
+        `Ativado | Ç iniciar | P parar | ⚙ configurações | Limite ${window.AUTO_ADS.formatarNumero(window.AUTO_ADS.limite)}`
     );
 
 })();
 
 
-
-
-
+// ============================================================
+// SCRIPT 02 - FILTRO WHATSAPP + BOTÕES DOS ANÚNCIOS
+// ============================================================
 
 (function () {
+
     'use strict';
 
     const processed = new WeakSet();
+
     let scanTimeout;
-function criarPainelFiltro() {
 
-    if (
-        document.getElementById(
-            'meu-filtro-whatsapp'
-        )
-    ) {
-        return;
-    }
 
-    const ativo =
-        localStorage.getItem(
-            'meuFiltroWhatsapp'
-        ) === '1';
+    function criarPainelFiltro() {
 
-    const painel = document.createElement('div');
+        if (
+            document.getElementById(
+                'meu-filtro-whatsapp'
+            )
+        ) {
+            return;
+        }
 
-    painel.id = 'meu-filtro-whatsapp';
 
-    painel.innerHTML = `
-        <div id="mw-toggle-track">
-            <div id="mw-toggle-ball"></div>
-        </div>
-        <div id="mw-gear">⚙</div>
-    `;
-
-   Object.assign(painel.style, {
-    position: 'fixed',
-    right: '20px',
-    bottom: '20px',
-    width: '70px',
-    height: '110px',
-    background: '#ff3b30',
-    borderRadius: '35px',
-    zIndex: '2147483647',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    boxShadow: '0 4px 16px rgba(0,0,0,.3)',
-    userSelect: 'none'
-});
-
-    const track =
-        painel.querySelector(
-            '#mw-toggle-track'
-        );
-
-    const ball =
-        painel.querySelector(
-            '#mw-toggle-ball'
-        );
-    const gear =
-    painel.querySelector('#mw-gear');
-
-Object.assign(gear.style, {
-    fontSize: '18px',
-    cursor: 'pointer',
-    lineHeight: '1'
-});
-
-    Object.assign(track.style, {
-        width: '52px',
-        height: '26px',
-        borderRadius: '20px',
-        background: '#111',
-        position: 'relative',
-        cursor: 'pointer'
-    });
-
-    Object.assign(ball.style, {
-        width: '22px',
-        height: '22px',
-        borderRadius: '50%',
-        background: '#e6e6e6',
-        position: 'absolute',
-        top: '2px',
-        transition: '.2s'
-    });
-
-    function atualizar() {
-
-        const ligado =
+        const ativo =
             localStorage.getItem(
                 'meuFiltroWhatsapp'
             ) === '1';
 
-        ball.style.left =
-            ligado
-                ? '28px'
-                : '2px';
-    }
 
-    atualizar();
+        const painel =
+            document.createElement('div');
 
-    track.addEventListener(
-        'click',
-        () => {
+
+        painel.id =
+            'meu-filtro-whatsapp';
+
+
+        painel.innerHTML = `
+
+            <div id="mw-toggle-track">
+                <div id="mw-toggle-ball"></div>
+            </div>
+
+            <div id="mw-gear">⚙</div>
+
+        `;
+
+
+        Object.assign(painel.style, {
+
+            position: 'fixed',
+
+            right: '20px',
+
+            bottom: '20px',
+
+            width: '70px',
+
+            height: '110px',
+
+            background: '#ff3b30',
+
+            borderRadius: '35px',
+
+            zIndex: '2147483647',
+
+            display: 'flex',
+
+            flexDirection: 'column',
+
+            alignItems: 'center',
+
+            justifyContent: 'space-evenly',
+
+            boxShadow:
+                '0 4px 16px rgba(0,0,0,.3)',
+
+            userSelect: 'none'
+
+        });
+
+
+        const track =
+            painel.querySelector(
+                '#mw-toggle-track'
+            );
+
+
+        const ball =
+            painel.querySelector(
+                '#mw-toggle-ball'
+            );
+
+
+        const gear =
+            painel.querySelector(
+                '#mw-gear'
+            );
+
+
+        Object.assign(
+            gear.style,
+            {
+                fontSize: '18px',
+                cursor: 'pointer',
+                lineHeight: '1'
+            }
+        );
+
+
+        Object.assign(
+            track.style,
+            {
+
+                width: '52px',
+
+                height: '26px',
+
+                borderRadius: '20px',
+
+                background: '#111',
+
+                position: 'relative',
+
+                cursor: 'pointer'
+
+            }
+        );
+
+
+        Object.assign(
+            ball.style,
+            {
+
+                width: '22px',
+
+                height: '22px',
+
+                borderRadius: '50%',
+
+                background: '#e6e6e6',
+
+                position: 'absolute',
+
+                top: '2px',
+
+                transition: '.2s'
+
+            }
+        );
+
+
+        function atualizar() {
 
             const ligado =
                 localStorage.getItem(
                     'meuFiltroWhatsapp'
                 ) === '1';
 
-            localStorage.setItem(
-                'meuFiltroWhatsapp',
-                ligado ? '0' : '1'
-            );
 
-            atualizar();
-
-            alert(
+            ball.style.left =
                 ligado
-                    ? 'Filtro WhatsApp DESATIVADO'
-                    : 'Filtro WhatsApp ATIVADO'
-            );
+                    ? '28px'
+                    : '2px';
+
         }
-    );
 
-painel
-    .querySelector('#mw-gear')
-    .addEventListener(
-        'click',
-        (e) => {
 
-            e.stopPropagation();
+        atualizar();
 
-            if (window.AUTO_ADS) {
-                window.AUTO_ADS.alterarVelocidade();
+
+        track.addEventListener(
+            'click',
+            () => {
+
+                const ligado =
+                    localStorage.getItem(
+                        'meuFiltroWhatsapp'
+                    ) === '1';
+
+
+                localStorage.setItem(
+                    'meuFiltroWhatsapp',
+                    ligado
+                        ? '0'
+                        : '1'
+                );
+
+
+                atualizar();
+
+
+                alert(
+                    ligado
+                        ? 'Filtro WhatsApp DESATIVADO'
+                        : 'Filtro WhatsApp ATIVADO'
+                );
+
             }
-        }
-    );
-    document.body.appendChild(
-        painel
-    );
-}
-    function injectCSS() {
-        if (document.getElementById('meu-ad-style')) return;
+        );
 
-        const style = document.createElement('style');
-        style.id = 'meu-ad-style';
+
+        painel
+            .querySelector('#mw-gear')
+            .addEventListener(
+                'click',
+                (e) => {
+
+                    e.stopPropagation();
+
+                    if (window.AUTO_ADS) {
+
+                        // abre o mesmo menu
+                        const popup =
+                            document.getElementById(
+                                "auto-ads-popup"
+                            );
+
+                        if (popup) {
+
+                            popup.style.display =
+                                popup.style.display === "none"
+                                    ? "block"
+                                    : "none";
+
+                        }
+
+                    }
+
+                }
+            );
+
+
+        document.body.appendChild(
+            painel
+        );
+
+    }
+
+
+    // ========================================================
+    // CSS
+    // ========================================================
+
+    function injectCSS() {
+
+        if (
+            document.getElementById(
+                'meu-ad-style'
+            )
+        ) {
+            return;
+        }
+
+
+        const style =
+            document.createElement('style');
+
+
+        style.id =
+            'meu-ad-style';
+
 
         style.textContent = `
+
             .meu-ad-bar {
+
                 display: flex;
+
                 gap: 6px;
+
                 margin-top: 4px;
+
                 margin-bottom: 4px;
+
                 flex-wrap: wrap;
+
                 position: relative;
+
                 z-index: 9999;
+
             }
+
 
             .meu-ad-btn {
+
                 all: unset;
+
                 cursor: pointer;
+
                 padding: 5px 8px;
+
                 font-size: 11px;
+
                 border-radius: 5px;
+
                 background: #f0f2f5;
+
                 border: 1px solid rgba(0,0,0,0.12);
+
                 display: inline-flex;
+
                 align-items: center;
+
                 white-space: nowrap;
+
                 user-select: none;
+
             }
+
 
             .meu-ad-btn:hover {
+
                 background: #e4e6eb;
+
             }
+
         `;
 
-        document.head.appendChild(style);
-    }
 
-    function criarBotao(texto, onClick) {
-        const btn = document.createElement('button');
-        btn.className = 'meu-ad-btn';
-        btn.textContent = texto;
-
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClick();
-        });
-
-        return btn;
-    }
-
-   function extrairPagina(card) {
-
-    const a = [...card.querySelectorAll('a[href*="facebook.com/"]')]
-        .find(el =>
-            !el.href.includes('l.facebook.com') &&
-            !el.href.includes('/ads/library')
+        document.head.appendChild(
+            style
         );
 
-    if (!a) return null;
+    }
 
-    const nome = (a.textContent || '').trim();
 
-    let pageId = null;
+    // ========================================================
+    // CRIAR BOTÃO
+    // ========================================================
 
-    try {
+    function criarBotao(
+        texto,
+        onClick
+    ) {
 
-        const reactKey = Object.keys(card)
-            .find(k => k.startsWith('__reactProps$'));
-
-        if (reactKey) {
-
-            const data = JSON.stringify(card[reactKey]);
-
-            const match = data.match(
-                /"page_id"\s*:\s*"(\d+)"/
+        const btn =
+            document.createElement(
+                'button'
             );
 
-            if (match) {
-                pageId = match[1];
+
+        btn.className =
+            'meu-ad-btn';
+
+
+        btn.textContent =
+            texto;
+
+
+        btn.addEventListener(
+            'click',
+            (e) => {
+
+                e.preventDefault();
+
+                e.stopPropagation();
+
+                onClick();
+
             }
-        }
-
-    } catch (e) {}
-
-    if (!pageId) {
-
-        const matchHref = a.href.match(
-            /facebook\.com\/(\d+)\/?$/
         );
 
-        if (matchHref) {
-            pageId = matchHref[1];
+
+        return btn;
+
+    }
+
+
+    // ========================================================
+    // EXTRAIR PÁGINA
+    // ========================================================
+
+    function extrairPagina(card) {
+
+        const a =
+            [...card.querySelectorAll(
+                'a[href*="facebook.com/"]'
+            )]
+            .find(el =>
+                !el.href.includes(
+                    'l.facebook.com'
+                ) &&
+                !el.href.includes(
+                    '/ads/library'
+                )
+            );
+
+
+        if (!a) {
+            return null;
         }
+
+
+        const nome =
+            (a.textContent || '')
+                .trim();
+
+
+        let pageId = null;
+
+
+        try {
+
+            const reactKey =
+                Object.keys(card)
+                    .find(k =>
+                        k.startsWith(
+                            '__reactProps$'
+                        )
+                    );
+
+
+            if (reactKey) {
+
+                const data =
+                    JSON.stringify(
+                        card[reactKey]
+                    );
+
+
+                const match =
+                    data.match(
+                        /"page_id"\s*:\s*"(\d+)"/
+                    );
+
+
+                if (match) {
+
+                    pageId =
+                        match[1];
+
+                }
+
+            }
+
+        } catch (e) {}
+
+
+        if (!pageId) {
+
+            const matchHref =
+                a.href.match(
+                    /facebook\.com\/(\d+)\/?$/
+                );
+
+
+            if (matchHref) {
+
+                pageId =
+                    matchHref[1];
+
+            }
+
+        }
+
+
+        return {
+            nome,
+            url: a.href,
+            pageId
+        };
+
     }
 
-    return {
-        nome,
-        url: a.href,
-        pageId
-    };
-}
-function extrairLanding(card) {
 
-    const a = [...card.querySelectorAll('a[href]')]
-        .find(el =>
-            el.href.includes('l.facebook.com/l.php?u=')
-        );
+    // ========================================================
+    // EXTRAIR LANDING
+    // ========================================================
 
-    if (!a) return null;
+    function extrairLanding(card) {
 
-    try {
+        const a =
+            [...card.querySelectorAll(
+                'a[href]'
+            )]
+            .find(el =>
+                el.href.includes(
+                    'l.facebook.com/l.php?u='
+                )
+            );
 
-        const url = new URL(a.href);
 
-        const raw =
-            url.searchParams.get('u');
+        if (!a) {
+            return null;
+        }
 
-        return raw
-            ? decodeURIComponent(raw)
-            : null;
 
-    } catch {
+        try {
 
-        return null;
+            const url =
+                new URL(a.href);
+
+
+            const raw =
+                url.searchParams.get('u');
+
+
+            return raw
+                ? decodeURIComponent(raw)
+                : null;
+
+        } catch {
+
+            return null;
+
+        }
+
     }
-}
+
+
+    // ========================================================
+    // FILTRO WHATSAPP
+    // ========================================================
 
     function filtroWhatsappAtivo() {
-    return localStorage.getItem('meuFiltroWhatsapp') === '1';
-}
 
-function ehLinkWhatsapp(url) {
+        return (
+            localStorage.getItem(
+                'meuFiltroWhatsapp'
+            ) === '1'
+        );
 
-    if (!url) return false;
-
-    url = url.toLowerCase();
-
-    return (
-        url.startsWith('https://api.whatsapp.com/send') ||
-        url.startsWith('http://api.whatsapp.com/send') ||
-        url.startsWith('https://wa.me/') ||
-        url.startsWith('http://wa.me/') ||
-        url.includes('whatsapp.com/send') ||
-        url.includes('wa.me/')
-    );
-}
-function abrirAdsLibrary(pageId) {
-
-    if (!pageId) {
-        alert('Page ID não encontrado');
-        return;
     }
 
-    const url =
-        `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&sort_data[mode]=total_impressions&sort_data[direction]=desc&view_all_page_id=${pageId}`;
 
-    window.open(url, '_blank');
-}
+    function ehLinkWhatsapp(url) {
+
+        if (!url) {
+            return false;
+        }
+
+
+        url =
+            url.toLowerCase();
+
+
+        return (
+
+            url.startsWith(
+                'https://api.whatsapp.com/send'
+            ) ||
+
+            url.startsWith(
+                'http://api.whatsapp.com/send'
+            ) ||
+
+            url.startsWith(
+                'https://wa.me/'
+            ) ||
+
+            url.startsWith(
+                'http://wa.me/'
+            ) ||
+
+            url.includes(
+                'whatsapp.com/send'
+            ) ||
+
+            url.includes(
+                'wa.me/'
+            )
+
+        );
+
+    }
+
+
+    // ========================================================
+    // ABRIR ADS LIBRARY
+    // ========================================================
+
+    function abrirAdsLibrary(pageId) {
+
+        if (!pageId) {
+
+            alert(
+                'Page ID não encontrado'
+            );
+
+            return;
+        }
+
+
+        const url =
+            `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&sort_data[mode]=total_impressions&sort_data[direction]=desc&view_all_page_id=${pageId}`;
+
+
+        window.open(
+            url,
+            '_blank'
+        );
+
+    }
+
+
+    // ========================================================
+    // ABRIR IMAGEM
+    // ========================================================
 
     function abrirImagem(card) {
 
-        const imagens = [...card.querySelectorAll('img')];
+        const imagens =
+            [...card.querySelectorAll(
+                'img'
+            )];
 
-        const img = imagens
-            .filter(i => {
-                const src = i.src || '';
 
-                return (
-                    src.includes('scontent') ||
-                    src.includes('fbcdn')
-                );
-            })
-            .sort((a, b) =>
-                (b.naturalWidth * b.naturalHeight) -
-                (a.naturalWidth * a.naturalHeight)
-            )[0];
+        const img =
+            imagens
+                .filter(i => {
+
+                    const src =
+                        i.src || '';
+
+
+                    return (
+
+                        src.includes(
+                            'scontent'
+                        ) ||
+
+                        src.includes(
+                            'fbcdn'
+                        )
+
+                    );
+
+                })
+                .sort((a, b) =>
+                    (
+                        b.naturalWidth *
+                        b.naturalHeight
+                    ) -
+                    (
+                        a.naturalWidth *
+                        a.naturalHeight
+                    )
+                )[0];
+
 
         if (!img) {
-            alert('Imagem não encontrada');
+
+            alert(
+                'Imagem não encontrada'
+            );
+
             return;
         }
 
-        window.open(img.src, '_blank');
+
+        window.open(
+            img.src,
+            '_blank'
+        );
+
     }
+
+
+    // ========================================================
+    // ABRIR VÍDEO
+    // ========================================================
 
     function abrirVideo(card) {
 
-        const video = card.querySelector('video');
+        const video =
+            card.querySelector(
+                'video'
+            );
+
 
         if (!video) {
-            alert('Vídeo não encontrado');
+
+            alert(
+                'Vídeo não encontrado'
+            );
+
             return;
         }
+
 
         const src =
             video.currentSrc ||
             video.src ||
-            video.querySelector('source')?.src;
+            video.querySelector(
+                'source'
+            )?.src;
+
 
         if (!src) {
-            alert('URL do vídeo não encontrada');
+
+            alert(
+                'URL do vídeo não encontrada'
+            );
+
             return;
         }
 
-        window.open(src, '_blank');
+
+        window.open(
+            src,
+            '_blank'
+        );
+
     }
+
+
+    // ========================================================
+    // REMOVER ANÚNCIO
+    // ========================================================
 
     function removerAnuncio(card) {
 
@@ -586,310 +1575,694 @@ function abrirAdsLibrary(pageId) {
             card.closest('.card-ad') ||
             card;
 
+
         container.style.transition =
             'opacity .15s ease';
 
-        container.style.opacity = '0';
+
+        container.style.opacity =
+            '0';
+
 
         setTimeout(() => {
+
             try {
-                processed.delete(card);
+
+                processed.delete(
+                    card
+                );
+
                 container.remove();
+
             } catch {}
+
         }, 150);
-    }
-function ehAnuncioWhatsapp(card) {
 
-    const texto = (
-        card.innerText ||
-        card.textContent ||
-        ''
-    ).toUpperCase();
-
-    return (
-        texto.includes('API.WHATSAPP.COM') ||
-        texto.includes('WHATSAPP.COM') ||
-        texto.includes('ENVIAR MENSAGEM PELO WHATSAPP')
-    );
-}
-   function processarCard(card) {
-if (
-    filtroWhatsappAtivo() &&
-    ehAnuncioWhatsapp(card)
-) {
-
-    removerAnuncio(card);
-    return;
-}
-    if (processed.has(card)) {
-        return;
     }
 
-    if (card.querySelector('.meu-ad-bar')) {
-        return;
-    }
 
-    const landing = extrairLanding(card);
+    // ========================================================
+    // DETECTAR WHATSAPP
+    // ========================================================
 
-console.log('LANDING REAL:', landing);
-    const pagina = extrairPagina(card);
-if (
-    filtroWhatsappAtivo() &&
-    ehLinkWhatsapp(landing)
-) {
-    removerAnuncio(card);
-    return;
-}
-    const temPageId =
-        pagina &&
-        pagina.pageId &&
-        /^\d+$/.test(pagina.pageId);
+    function ehAnuncioWhatsapp(card) {
 
-    if (!landing && !temPageId) {
-        return;
-    }
+        const texto = (
 
-    const bar = document.createElement('div');
-    bar.className = 'meu-ad-bar';
+            card.innerText ||
 
-    if (landing) {
-        bar.appendChild(
-            criarBotao('🌐 Site', () => {
-                window.open(landing, '_blank');
-            })
+            card.textContent ||
+
+            ''
+
+        ).toUpperCase();
+
+
+        return (
+
+            texto.includes(
+                'API.WHATSAPP.COM'
+            ) ||
+
+            texto.includes(
+                'WHATSAPP.COM'
+            ) ||
+
+            texto.includes(
+                'ENVIAR MENSAGEM PELO WHATSAPP'
+            )
+
         );
+
     }
 
-    if (temPageId) {
-        bar.appendChild(
-            criarBotao('📘 Ads', () => {
-                abrirAdsLibrary(pagina.pageId);
-            })
-        );
-    }
 
-    if (card.querySelector('img')) {
-        bar.appendChild(
-            criarBotao('🖼️ Imagem', () => {
-                abrirImagem(card);
-            })
-        );
-    }
+    // ========================================================
+    // PROCESSAR CARD
+    // ========================================================
 
-    if (card.querySelector('video')) {
-        bar.appendChild(
-            criarBotao('🎥 Vídeo', () => {
-                abrirVideo(card);
-            })
-        );
-    }
+    function processarCard(card) {
 
-    const btnFechar = criarBotao(
-        '❌ Fechar',
-        () => {
+        if (
 
-            if (btnFechar.dataset.confirmando === '1') {
-                removerAnuncio(card);
-                return;
-            }
+            filtroWhatsappAtivo() &&
 
-            btnFechar.dataset.confirmando = '1';
-            btnFechar.textContent = '⚠️ Confirmar';
+            ehAnuncioWhatsapp(card)
 
-            setTimeout(() => {
+        ) {
 
-                if (
-                    btnFechar.isConnected &&
-                    btnFechar.dataset.confirmando === '1'
-                ) {
+            removerAnuncio(card);
 
-                    btnFechar.dataset.confirmando = '0';
-                    btnFechar.textContent = '❌ Fechar';
-                }
+            return;
 
-            }, 3000);
         }
-    );
 
-    bar.appendChild(btnFechar);
 
-    const patrocinadoContainer =
-        card.querySelector('div._8nrv');
+        if (
+            processed.has(card)
+        ) {
 
-    if (patrocinadoContainer) {
+            return;
 
-        patrocinadoContainer.insertAdjacentElement(
-            'afterend',
-            bar
+        }
+
+
+        if (
+            card.querySelector(
+                '.meu-ad-bar'
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const landing =
+            extrairLanding(
+                card
+            );
+
+
+        const pagina =
+            extrairPagina(
+                card
+            );
+
+
+        if (
+
+            filtroWhatsappAtivo() &&
+
+            ehLinkWhatsapp(
+                landing
+            )
+
+        ) {
+
+            removerAnuncio(
+                card
+            );
+
+            return;
+
+        }
+
+
+        const temPageId =
+
+            pagina &&
+
+            pagina.pageId &&
+
+            /^\d+$/.test(
+                pagina.pageId
+            );
+
+
+        if (
+            !landing &&
+            !temPageId
+        ) {
+
+            return;
+
+        }
+
+
+        const bar =
+            document.createElement(
+                'div'
+            );
+
+
+        bar.className =
+            'meu-ad-bar';
+
+
+        if (landing) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🌐 Site',
+                    () => {
+
+                        window.open(
+                            landing,
+                            '_blank'
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        if (temPageId) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '📘 Ads',
+                    () => {
+
+                        abrirAdsLibrary(
+                            pagina.pageId
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        if (
+            card.querySelector(
+                'img'
+            )
+        ) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🖼️ Imagem',
+                    () => {
+
+                        abrirImagem(
+                            card
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        if (
+            card.querySelector(
+                'video'
+            )
+        ) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🎥 Vídeo',
+                    () => {
+
+                        abrirVideo(
+                            card
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        const btnFechar =
+            criarBotao(
+                '❌ Fechar',
+                () => {
+
+                    if (
+                        btnFechar.dataset.confirmando === '1'
+                    ) {
+
+                        removerAnuncio(
+                            card
+                        );
+
+                        return;
+
+                    }
+
+
+                    btnFechar.dataset.confirmando =
+                        '1';
+
+
+                    btnFechar.textContent =
+                        '⚠️ Confirmar';
+
+
+                    setTimeout(() => {
+
+                        if (
+
+                            btnFechar.isConnected &&
+
+                            btnFechar.dataset.confirmando === '1'
+
+                        ) {
+
+                            btnFechar.dataset.confirmando =
+                                '0';
+
+
+                            btnFechar.textContent =
+                                '❌ Fechar';
+
+                        }
+
+                    }, 3000);
+
+                }
+            );
+
+
+        bar.appendChild(
+            btnFechar
         );
 
-    } else {
 
-        const fallback =
-            card.querySelector('.ad-ui-container') ||
-            card;
+        const patrocinadoContainer =
+            card.querySelector(
+                'div._8nrv'
+            );
 
-        fallback.prepend(bar);
+
+        if (
+            patrocinadoContainer
+        ) {
+
+            patrocinadoContainer
+                .insertAdjacentElement(
+                    'afterend',
+                    bar
+                );
+
+        } else {
+
+            const fallback =
+
+                card.querySelector(
+                    '.ad-ui-container'
+                ) ||
+
+                card;
+
+
+            fallback.prepend(
+                bar
+            );
+
+        }
+
+
+        processed.add(
+            card
+        );
+
     }
 
-    processed.add(card);
-}
+
+    // ========================================================
+    // ENCONTRAR CARDS
+    // ========================================================
 
     function findCards() {
 
-    return [
-        ...document.querySelectorAll('.card-ad'),
-        ...document.querySelectorAll('[class*="xh8yej3"]')
-    ];
+        return [
 
-}
+            ...document.querySelectorAll(
+                '.card-ad'
+            ),
+
+            ...document.querySelectorAll(
+                '[class*="xh8yej3"]'
+            )
+
+        ];
+
+    }
+
+
+    // ========================================================
+    // SCAN
+    // ========================================================
 
     function scan() {
 
-        const cards = findCards();
+        const cards =
+            findCards();
 
-        for (const card of cards) {
-            processarCard(card);
+
+        for (
+            const card of cards
+        ) {
+
+            processarCard(
+                card
+            );
+
         }
+
     }
+
+
+    // ========================================================
+    // START
+    // ========================================================
 
     function start() {
 
         injectCSS();
-   criarPainelFiltro();
+
+        criarPainelFiltro();
+
         scan();
 
-setTimeout(scan, 1000);
-setTimeout(scan, 2500);
-setTimeout(scan, 5000);
 
-        const observer = new MutationObserver(() => {
+        setTimeout(
+            scan,
+            1000
+        );
 
-            clearTimeout(scanTimeout);
 
-            scanTimeout = setTimeout(() => {
-                scan();
-            }, 300);
+        setTimeout(
+            scan,
+            2500
+        );
 
-        });
 
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        setTimeout(
+            scan,
+            5000
+        );
+
+
+        const observer =
+            new MutationObserver(
+                () => {
+
+                    clearTimeout(
+                        scanTimeout
+                    );
+
+
+                    scanTimeout =
+                        setTimeout(
+                            () => {
+                                scan();
+                            },
+                            300
+                        );
+
+                }
+            );
+
+
+        observer.observe(
+            document.body,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
+
     }
+
 
     start();
 
 })();
 
 
-//SCRIPT 03 - OTIMIZAR RAM
+// ============================================================
+// SCRIPT 03 - OTIMIZAR RAM
+// ============================================================
+
 (function () {
+
     'use strict';
 
-    if (window.__adsLibraryOptimizerLoaded) return;
-    window.__adsLibraryOptimizerLoaded = true;
 
-    const STYLE_ID = 'ads-library-memory-optimizer';
+    if (
+        window.__adsLibraryOptimizerLoaded
+    ) {
+        return;
+    }
+
+
+    window.__adsLibraryOptimizerLoaded =
+        true;
+
+
+    const STYLE_ID =
+        'ads-library-memory-optimizer';
+
 
     function injectCSS() {
 
-        if (document.getElementById(STYLE_ID)) return;
+        if (
+            document.getElementById(
+                STYLE_ID
+            )
+        ) {
+            return;
+        }
 
-        const style = document.createElement('style');
-        style.id = STYLE_ID;
+
+        const style =
+            document.createElement(
+                'style'
+            );
+
+
+        style.id =
+            STYLE_ID;
+
 
         style.textContent = `
 
-    .card-ad {
-    content-visibility: auto !important;
-    contain-intrinsic-size: 1200px !important;
-    contain: content !important;
-    overflow: hidden !important;
-}
+            .card-ad {
 
-       video {
-    contain: layout paint style !important;
-}
+                content-visibility:
+                    auto !important;
 
-        img {
-            will-change: auto !important;
-        }
+                contain-intrinsic-size:
+                    1200px !important;
+
+                contain:
+                    content !important;
+
+                overflow:
+                    hidden !important;
+
+            }
+
+
+            video {
+
+                contain:
+                    layout paint style !important;
+
+            }
+
+
+            img {
+
+                will-change:
+                    auto !important;
+
+            }
 
         `;
 
-        document.head.appendChild(style);
+
+        document.head.appendChild(
+            style
+        );
+
     }
+
 
     function optimizeVideos() {
 
-        const videos = document.querySelectorAll('video');
+        const videos =
+            document.querySelectorAll(
+                'video'
+            );
 
-        videos.forEach(video => {
 
-            if (video.dataset.memoryOptimized) return;
+        videos.forEach(
+            video => {
 
-            video.dataset.memoryOptimized = '1';
+                if (
+                    video.dataset.memoryOptimized
+                ) {
+                    return;
+                }
 
-            video.preload = 'metadata';
 
-        });
+                video.dataset.memoryOptimized =
+                    '1';
+
+
+                video.preload =
+                    'metadata';
+
+            }
+        );
+
     }
+
 
     function optimizeImages() {
 
-        const images = document.querySelectorAll('img');
+        const images =
+            document.querySelectorAll(
+                'img'
+            );
 
-        images.forEach(img => {
 
-            if (img.dataset.memoryOptimized) return;
+        images.forEach(
+            img => {
 
-            img.dataset.memoryOptimized = '1';
+                if (
+                    img.dataset.memoryOptimized
+                ) {
+                    return;
+                }
 
-            img.loading = 'lazy';
-            img.decoding = 'async';
 
-        });
+                img.dataset.memoryOptimized =
+                    '1';
+
+
+                img.loading =
+                    'lazy';
+
+
+                img.decoding =
+                    'async';
+
+            }
+        );
+
     }
+
 
     function runOptimizations() {
 
         optimizeVideos();
+
         optimizeImages();
 
     }
+
 
     injectCSS();
 
     runOptimizations();
 
-    const observer = new MutationObserver(mutations => {
 
-    let encontrouNovoConteudo = false;
+    const observer =
+        new MutationObserver(
+            mutations => {
 
-    for (const mutation of mutations) {
+                let encontrouNovoConteudo =
+                    false;
 
-        if (mutation.addedNodes.length) {
-            encontrouNovoConteudo = true;
-            break;
+
+                for (
+                    const mutation of mutations
+                ) {
+
+                    if (
+                        mutation.addedNodes.length
+                    ) {
+
+                        encontrouNovoConteudo =
+                            true;
+
+                        break;
+
+                    }
+
+                }
+
+
+                if (
+                    !encontrouNovoConteudo
+                ) {
+                    return;
+                }
+
+
+                clearTimeout(
+                    window.__adsOptimizerTimeout
+                );
+
+
+                window.__adsOptimizerTimeout =
+                    setTimeout(
+                        runOptimizations,
+                        1000
+                    );
+
+            }
+        );
+
+
+    observer.observe(
+        document.body,
+        {
+            childList: true,
+            subtree: true
         }
+    );
 
-    }
-
-    if (!encontrouNovoConteudo) return;
-
-    clearTimeout(window.__adsOptimizerTimeout);
-
-    window.__adsOptimizerTimeout =
-        setTimeout(runOptimizations, 1000);
-
-});
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
 
     console.log(
         '[Ads Library Optimizer] ativo'
