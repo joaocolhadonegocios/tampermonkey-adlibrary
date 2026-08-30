@@ -1,3 +1,4 @@
+```javascript
 // ============================================================
 // AUTO ADS LIBRARY
 // ATUALIZADO 30.08.2026
@@ -5,8 +6,10 @@
 
 (() => {
 
+    'use strict';
+
     // ========================================================
-    // MATA INSTALAÇÃO ANTERIOR
+    // LIMPA INSTALAÇÃO ANTERIOR
     // ========================================================
 
     if (window.AUTO_ADS?.timer) {
@@ -15,6 +18,10 @@
 
     if (window.AUTO_ADS?.limitMonitor) {
         clearInterval(window.AUTO_ADS.limitMonitor);
+    }
+
+    if (window.autoAdsToastTimer) {
+        clearTimeout(window.autoAdsToastTimer);
     }
 
     document.getElementById("auto-ads-config-btn")?.remove();
@@ -33,6 +40,7 @@
         if (!toast) {
 
             toast = document.createElement("div");
+
             toast.id = "auto-ads-toast";
 
             Object.assign(toast.style, {
@@ -47,7 +55,8 @@
                 fontSize: "14px",
                 fontFamily: "Arial, sans-serif",
                 boxShadow: "0 4px 12px rgba(0,0,0,.3)",
-                transition: "opacity .2s"
+                transition: "opacity .2s",
+                pointerEvents: "none"
             });
 
             document.body.appendChild(toast);
@@ -74,18 +83,17 @@
 
         limitMonitor: null,
 
-        // velocidade padrão
         intervalo: 3000,
 
-        // limite padrão
         limite: parseInt(
             localStorage.getItem("autoAdsLimite") || "3000",
             10
         ),
 
-        // ----------------------------------------------------
-        // FORMATA NÚMEROS
-        // ----------------------------------------------------
+
+        // ====================================================
+        // FORMATA NÚMERO
+        // ====================================================
 
         formatarNumero(numero) {
 
@@ -93,16 +101,36 @@
 
         },
 
-        // ----------------------------------------------------
-        // LÊ O CONTADOR DO COPY ADS
-        // ----------------------------------------------------
+
+        // ====================================================
+        // LÊ CONTADOR DA ADS LIBRARY
+        // ====================================================
 
         obterQuantidadeAnuncios() {
 
-            const badge =
-                document.querySelector(
-                    "#filtered-ads-toggle-btn .ui-btn-badge"
+            /*
+             * O Facebook altera o contador conforme o conteúdo
+             * é carregado durante o scroll.
+             *
+             * Procuramos primeiro pelo seletor conhecido.
+             */
+
+            let badge = document.querySelector(
+                "#filtered-ads-toggle-btn .ui-btn-badge"
+            );
+
+            /*
+             * Fallback caso o Facebook altere levemente
+             * a estrutura do elemento.
+             */
+
+            if (!badge) {
+
+                badge = document.querySelector(
+                    "#filtered-ads-toggle-btn"
                 );
+
+            }
 
             if (!badge) {
                 return null;
@@ -115,15 +143,15 @@
             ).trim();
 
             /*
-                Exemplos:
-
-                92/92
-                1.245/1.245
-                3.000/3.000
-                4000/4000
-
-                Pegamos o SEGUNDO número.
-            */
+             * Exemplos:
+             *
+             * 92/92
+             * 1.245/1.245
+             * 3.000/3.000
+             * 4000/4000
+             *
+             * Pegamos sempre o SEGUNDO número.
+             */
 
             const match = texto.match(
                 /\/\s*([\d.,]+)/
@@ -133,7 +161,17 @@
                 return null;
             }
 
-            let numeroTexto = match[1]
+            let numeroTexto = match[1];
+
+            /*
+             * pt-BR:
+             * 3.000 -> 3000
+             * 1.245 -> 1245
+             *
+             * Também suporta números sem separador.
+             */
+
+            numeroTexto = numeroTexto
                 .replace(/\./g, "")
                 .replace(/,/g, "");
 
@@ -150,9 +188,9 @@
         },
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // VERIFICA LIMITE
-        // ----------------------------------------------------
+        // ====================================================
 
         verificarLimite() {
 
@@ -190,74 +228,72 @@
         },
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // EXECUTA SCROLL + VER MAIS
-        // ----------------------------------------------------
+        // ====================================================
 
         executar() {
-
-            // PRIMEIRA COISA:
-            // verifica se já chegou no limite
 
             if (this.verificarLimite()) {
                 return;
             }
-
-
-            // ------------------------------------------------
-            // SCROLL
-            // ------------------------------------------------
 
             window.scrollBy({
                 top: 1200,
                 behavior: "smooth"
             });
 
+            /*
+             * Pequeno atraso para dar tempo ao Facebook
+             * de atualizar o DOM depois do scroll.
+             */
 
-            // ------------------------------------------------
-            // CLICA EM "VER MAIS"
-            // ------------------------------------------------
+            setTimeout(() => {
 
-            document
-                .querySelectorAll(
-                    'a[role="button"], button, div[role="button"], span'
-                )
-                .forEach(el => {
+                if (this.verificarLimite()) {
+                    return;
+                }
 
-                    const texto = (
-                        el.innerText || ""
+                document
+                    .querySelectorAll(
+                        'a[role="button"], button, div[role="button"], span'
                     )
-                        .trim()
-                        .toLowerCase();
+                    .forEach(el => {
 
-                    if (
-                        texto === "ver mais" ||
-                        texto.startsWith("ver mais") ||
-                        texto.includes("ver mais")
-                    ) {
+                        const texto = (
+                            el.innerText || ""
+                        )
+                            .trim()
+                            .toLowerCase();
 
-                        try {
-                            el.click();
-                        } catch {}
-                    }
+                        if (
+                            texto === "ver mais" ||
+                            texto.startsWith("ver mais") ||
+                            texto.includes("ver mais")
+                        ) {
 
-                });
+                            try {
+                                el.click();
+                            } catch {}
+
+                        }
+
+                    });
+
+            }, 350);
+
         },
 
 
-        // ----------------------------------------------------
-        // INICIA
-        // ----------------------------------------------------
+        // ====================================================
+        // INICIAR
+        // ====================================================
 
         iniciar() {
-
-            // Segurança:
-            // se já estiver no limite, não inicia
 
             if (this.verificarLimite()) {
                 return;
             }
-
 
             if (this.timer) {
 
@@ -268,13 +304,11 @@
                 return;
             }
 
-
             this.timer = setInterval(() => {
 
                 this.executar();
 
             }, this.intervalo);
-
 
             mostrarMensagem(
                 `🚀 Iniciado (${this.intervalo / 1000}s) | Limite ${this.formatarNumero(this.limite)}`
@@ -282,9 +316,9 @@
         },
 
 
-        // ----------------------------------------------------
-        // PARA
-        // ----------------------------------------------------
+        // ====================================================
+        // PARAR
+        // ====================================================
 
         parar() {
 
@@ -297,11 +331,9 @@
                 return;
             }
 
-
             clearInterval(this.timer);
 
             this.timer = null;
-
 
             mostrarMensagem(
                 "🛑 Parado"
@@ -309,32 +341,28 @@
         },
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // ALTERAR VELOCIDADE
-        // ----------------------------------------------------
+        // ====================================================
 
         alterarVelocidade() {
 
             const atual =
                 this.intervalo / 1000;
 
-
             const valor = prompt(
                 `Velocidade atual: ${atual}s\n\nDigite a nova velocidade em segundos:`,
                 atual
             );
 
-
             if (valor === null) {
                 return;
             }
-
 
             const segundos =
                 parseFloat(
                     valor.replace(",", ".")
                 );
-
 
             if (
                 isNaN(segundos) ||
@@ -348,14 +376,11 @@
                 return;
             }
 
-
             this.intervalo =
                 segundos * 1000;
 
-
             const estavaRodando =
                 !!this.timer;
-
 
             if (estavaRodando) {
 
@@ -368,11 +393,9 @@
                 this.iniciar();
             }
 
-
             mostrarMensagem(
                 `⚡ Velocidade: ${segundos}s`
             );
-
 
             console.log(
                 "[AUTO ADS] Intervalo atualizado:",
@@ -382,9 +405,9 @@
         },
 
 
-        // ----------------------------------------------------
-        // CONVERTE 3K / 4K / 3000 ETC.
-        // ----------------------------------------------------
+        // ====================================================
+        // CONVERTER LIMITE
+        // ====================================================
 
         converterLimite(valor) {
 
@@ -396,16 +419,17 @@
                 String(valor)
                     .trim()
                     .toLowerCase()
-                    .replace(/\s/g, "")
-                    .replace(",", ".");
+                    .replace(/\s/g, "");
 
+            // -----------------------------------------------
+            // 3k / 4k / 10k
+            // -----------------------------------------------
 
-            // 3k
             if (texto.endsWith("k")) {
 
                 const numero =
                     parseFloat(
-                        texto.slice(0, -1)
+                        texto.slice(0, -1).replace(",", ".")
                     );
 
                 if (
@@ -420,18 +444,18 @@
                 );
             }
 
+            // -----------------------------------------------
+            // 3000 / 3.000 / 10000
+            // -----------------------------------------------
 
-            // 3000 / 4000 / 10000
             texto =
                 texto.replace(/\./g, "");
-
 
             const numero =
                 parseInt(
                     texto,
                     10
                 );
-
 
             if (
                 isNaN(numero) ||
@@ -440,14 +464,13 @@
                 return null;
             }
 
-
             return numero;
         },
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // ALTERAR LIMITE
-        // ----------------------------------------------------
+        // ====================================================
 
         alterarLimite() {
 
@@ -456,21 +479,17 @@
                     this.limite
                 );
 
-
             const valor = prompt(
                 `Limite atual: ${atual} anúncios\n\nDigite o novo limite:\n\nExemplos: 3000, 3k, 4k, 5000`,
                 atual
             );
 
-
             if (valor === null) {
                 return;
             }
 
-
             const novoLimite =
                 this.converterLimite(valor);
-
 
             if (
                 novoLimite === null ||
@@ -484,57 +503,41 @@
                 return;
             }
 
-
             this.limite =
                 novoLimite;
-
 
             localStorage.setItem(
                 "autoAdsLimite",
                 String(novoLimite)
             );
 
-
             atualizarTextoLimite();
-
 
             mostrarMensagem(
                 `🔢 Limite definido: ${this.formatarNumero(novoLimite)}`
             );
-
 
             console.log(
                 "[AUTO ADS] Novo limite:",
                 novoLimite
             );
 
-
-            // Se já estiver acima do novo limite,
-            // para imediatamente.
-
             this.verificarLimite();
         },
 
 
-        // ----------------------------------------------------
-        // MONITORAMENTO CONTÍNUO DO COPY ADS
-        // ----------------------------------------------------
+        // ====================================================
+        // MONITORAMENTO DO CONTADOR
+        // ====================================================
 
         iniciarMonitorLimite() {
 
             if (this.limitMonitor) {
+
                 clearInterval(
                     this.limitMonitor
                 );
             }
-
-
-            /*
-                Verifica a cada 500ms.
-
-                Isso evita depender apenas do
-                intervalo de scroll de 3 segundos.
-            */
 
             this.limitMonitor =
                 setInterval(() => {
@@ -559,20 +562,29 @@
 
     Object.assign(popup.style, {
 
-        position: "fixed",
-        bottom: "80px",
-        right: "20px",
+        /*
+         * IMPORTANTE:
+         * Agora fica AO LADO do painel laranja.
+         * Não fica mais em cima dele.
+         */
 
-        width: "190px",
+        position: "fixed",
+
+        bottom: "20px",
+
+        right: "105px",
+
+        width: "210px",
 
         background: "#111",
+
         color: "#fff",
 
         borderRadius: "12px",
 
         padding: "10px",
 
-        zIndex: "2147483647",
+        zIndex: "2147483646",
 
         boxShadow:
             "0 6px 20px rgba(0,0,0,.4)",
@@ -582,7 +594,9 @@
 
         display: "none",
 
-        boxSizing: "border-box"
+        boxSizing: "border-box",
+
+        border: "1px solid rgba(255,255,255,.08)"
 
     });
 
@@ -610,54 +624,62 @@
 
 
     // ========================================================
-    // ESTILO DOS BOTÕES DO POPUP
+    // ESTILO DOS BOTÕES
     // ========================================================
 
-    popup.querySelectorAll("button").forEach(button => {
+    popup
+        .querySelectorAll("button")
+        .forEach(button => {
 
-        Object.assign(button.style, {
+            Object.assign(button.style, {
 
-            width: "100%",
+                width: "100%",
 
-            border: "none",
+                border: "none",
 
-            background: "#222",
+                background: "#222",
 
-            color: "#fff",
+                color: "#fff",
 
-            padding: "9px 10px",
+                padding: "10px",
 
-            marginBottom: "6px",
+                marginBottom: "6px",
 
-            borderRadius: "7px",
+                borderRadius: "7px",
 
-            cursor: "pointer",
+                cursor: "pointer",
 
-            fontSize: "12px",
+                fontSize: "12px",
 
-            textAlign: "left"
+                textAlign: "left",
+
+                boxSizing: "border-box"
+
+            });
+
+
+            button.addEventListener(
+                "mouseenter",
+                () => {
+
+                    button.style.background =
+                        "#333";
+
+                }
+            );
+
+
+            button.addEventListener(
+                "mouseleave",
+                () => {
+
+                    button.style.background =
+                        "#222";
+
+                }
+            );
 
         });
-
-
-        button.addEventListener(
-            "mouseenter",
-            () => {
-                button.style.background =
-                    "#333";
-            }
-        );
-
-
-        button.addEventListener(
-            "mouseleave",
-            () => {
-                button.style.background =
-                    "#222";
-            }
-        );
-
-    });
 
 
     document.body.appendChild(
@@ -666,7 +688,7 @@
 
 
     // ========================================================
-    // ATUALIZA TEXTO DO BOTÃO DE LIMITE
+    // ATUALIZA TEXTO DO LIMITE
     // ========================================================
 
     function atualizarTextoLimite() {
@@ -691,11 +713,18 @@
 
     document
         .getElementById("auto-ads-speed-btn")
-        .addEventListener("click", () => {
+        .addEventListener(
+            "click",
+            (e) => {
 
-            window.AUTO_ADS.alterarVelocidade();
+                e.preventDefault();
 
-        });
+                e.stopPropagation();
+
+                window.AUTO_ADS.alterarVelocidade();
+
+            }
+        );
 
 
     // ========================================================
@@ -704,16 +733,28 @@
 
     document
         .getElementById("auto-ads-limit-btn")
-        .addEventListener("click", () => {
+        .addEventListener(
+            "click",
+            (e) => {
 
-            window.AUTO_ADS.alterarLimite();
+                e.preventDefault();
 
-        });
+                e.stopPropagation();
+
+                window.AUTO_ADS.alterarLimite();
+
+            }
+        );
 
 
     // ========================================================
-    // BOTÃO FLUTUANTE
+    // BOTÃO FLUTUANTE AUTO ADS
     // ========================================================
+
+    /*
+     * Mantido como fallback.
+     * O painel laranja também abre o mesmo popup.
+     */
 
     const btn =
         document.createElement("div");
@@ -730,9 +771,11 @@
         position: "fixed",
 
         bottom: "20px",
+
         right: "20px",
 
         width: "50px",
+
         height: "50px",
 
         borderRadius: "50%",
@@ -741,9 +784,10 @@
 
         color: "#fff",
 
-        display: "flex",
+        display: "none",
 
         alignItems: "center",
+
         justifyContent: "center",
 
         fontSize: "24px",
@@ -768,6 +812,8 @@
         "click",
         (e) => {
 
+            e.preventDefault();
+
             e.stopPropagation();
 
             popup.style.display =
@@ -785,28 +831,36 @@
 
 
     // ========================================================
-    // FECHA POPUP AO CLICAR FORA
+    // FECHAR POPUP CLICANDO FORA
     // ========================================================
 
     document.addEventListener(
         "click",
         (e) => {
 
-            if (
-                !popup.contains(e.target) &&
-                e.target !== btn
-            ) {
+            const alvo =
+                e.target;
 
-                popup.style.display =
-                    "none";
+            if (
+                popup.contains(alvo) ||
+                alvo === btn ||
+                document
+                    .getElementById("mw-gear")
+                    ?.contains(alvo)
+            ) {
+                return;
             }
 
-        }
+            popup.style.display =
+                "none";
+
+        },
+        true
     );
 
 
     // ========================================================
-    // TECLAS DE ATALHO
+    // ATALHOS
     // ========================================================
 
     document.addEventListener(
@@ -816,22 +870,21 @@
             const tecla =
                 e.key.toLowerCase();
 
-
             if (
                 ["input", "textarea"].includes(
-                    document.activeElement?.tagName?.toLowerCase()
+                    document.activeElement
+                        ?.tagName
+                        ?.toLowerCase()
                 )
             ) {
                 return;
             }
-
 
             if (tecla === "p") {
 
                 window.AUTO_ADS.parar();
 
             }
-
 
             if (tecla === "ç") {
 
@@ -844,7 +897,7 @@
 
 
     // ========================================================
-    // INICIA MONITORAMENTO DO LIMITE
+    // MONITORAMENTO
     // ========================================================
 
     window.AUTO_ADS.iniciarMonitorLimite();
@@ -858,17 +911,24 @@
 
 
 // ============================================================
-// SCRIPT 02 - FILTRO WHATSAPP + BOTÕES DOS ANÚNCIOS
+// SCRIPT 02
+// FILTRO WHATSAPP + BOTÕES DOS ANÚNCIOS
 // ============================================================
 
 (function () {
 
     'use strict';
 
-    const processed = new WeakSet();
+
+    const processed =
+        new WeakSet();
 
     let scanTimeout;
 
+
+    // ========================================================
+    // PAINEL LARANJA
+    // ========================================================
 
     function criarPainelFiltro() {
 
@@ -879,12 +939,6 @@
         ) {
             return;
         }
-
-
-        const ativo =
-            localStorage.getItem(
-                'meuFiltroWhatsapp'
-            ) === '1';
 
 
         const painel =
@@ -901,43 +955,48 @@
                 <div id="mw-toggle-ball"></div>
             </div>
 
-            <div id="mw-gear">⚙</div>
+            <div id="mw-gear" title="Configurações Auto Ads">
+                ⚙
+            </div>
 
         `;
 
 
-        Object.assign(painel.style, {
+        Object.assign(
+            painel.style,
+            {
 
-            position: 'fixed',
+                position: 'fixed',
 
-            right: '20px',
+                right: '20px',
 
-            bottom: '20px',
+                bottom: '20px',
 
-            width: '70px',
+                width: '70px',
 
-            height: '110px',
+                height: '110px',
 
-            background: '#ff3b30',
+                background: '#ff3b30',
 
-            borderRadius: '35px',
+                borderRadius: '35px',
 
-            zIndex: '2147483647',
+                zIndex: '2147483647',
 
-            display: 'flex',
+                display: 'flex',
 
-            flexDirection: 'column',
+                flexDirection: 'column',
 
-            alignItems: 'center',
+                alignItems: 'center',
 
-            justifyContent: 'space-evenly',
+                justifyContent: 'space-evenly',
 
-            boxShadow:
-                '0 4px 16px rgba(0,0,0,.3)',
+                boxShadow:
+                    '0 4px 16px rgba(0,0,0,.3)',
 
-            userSelect: 'none'
+                userSelect: 'none'
 
-        });
+            }
+        );
 
 
         const track =
@@ -958,15 +1017,64 @@
             );
 
 
+        // ====================================================
+        // ENGRENAGEM
+        // ====================================================
+
         Object.assign(
             gear.style,
             {
-                fontSize: '18px',
+
+                width: '40px',
+
+                height: '34px',
+
+                display: 'flex',
+
+                alignItems: 'center',
+
+                justifyContent: 'center',
+
+                fontSize: '20px',
+
                 cursor: 'pointer',
-                lineHeight: '1'
+
+                lineHeight: '1',
+
+                borderRadius: '8px',
+
+                transition:
+                    'background .15s'
+
             }
         );
 
+
+        gear.addEventListener(
+            'mouseenter',
+            () => {
+
+                gear.style.background =
+                    'rgba(0,0,0,.15)';
+
+            }
+        );
+
+
+        gear.addEventListener(
+            'mouseleave',
+            () => {
+
+                gear.style.background =
+                    'transparent';
+
+            }
+        );
+
+
+        // ====================================================
+        // TOGGLE
+        // ====================================================
 
         Object.assign(
             track.style,
@@ -1004,7 +1112,10 @@
 
                 top: '2px',
 
-                transition: '.2s'
+                transition: '.2s',
+
+                boxShadow:
+                    '0 1px 3px rgba(0,0,0,.3)'
 
             }
         );
@@ -1017,21 +1128,27 @@
                     'meuFiltroWhatsapp'
                 ) === '1';
 
-
             ball.style.left =
                 ligado
                     ? '28px'
                     : '2px';
-
         }
 
 
         atualizar();
 
 
+        // ====================================================
+        // TOGGLE WHATSAPP
+        // ====================================================
+
         track.addEventListener(
             'click',
-            () => {
+            (e) => {
+
+                e.preventDefault();
+
+                e.stopPropagation();
 
                 const ligado =
                     localStorage.getItem(
@@ -1060,35 +1177,40 @@
         );
 
 
-        painel
-            .querySelector('#mw-gear')
-            .addEventListener(
-                'click',
-                (e) => {
+        // ====================================================
+        // ENGRENAGEM ABRE O POPUP
+        // ====================================================
 
-                    e.stopPropagation();
+        gear.addEventListener(
+            'click',
+            (e) => {
 
-                    if (window.AUTO_ADS) {
+                e.preventDefault();
 
-                        // abre o mesmo menu
-                        const popup =
-                            document.getElementById(
-                                "auto-ads-popup"
-                            );
+                e.stopPropagation();
 
-                        if (popup) {
+                const popup =
+                    document.getElementById(
+                        "auto-ads-popup"
+                    );
 
-                            popup.style.display =
-                                popup.style.display === "none"
-                                    ? "block"
-                                    : "none";
+                if (!popup) {
 
-                        }
+                    console.warn(
+                        "[AUTO ADS] Popup não encontrado."
+                    );
 
-                    }
-
+                    return;
                 }
-            );
+
+
+                popup.style.display =
+                    popup.style.display === "none"
+                        ? "block"
+                        : "none";
+
+            }
+        );
 
 
         document.body.appendChild(
@@ -1099,7 +1221,7 @@
 
 
     // ========================================================
-    // CSS
+    // CSS DOS BOTÕES DOS ANÚNCIOS
     // ========================================================
 
     function injectCSS() {
@@ -1165,6 +1287,8 @@
                 white-space: nowrap;
 
                 user-select: none;
+
+                box-sizing: border-box;
 
             }
 
@@ -1238,12 +1362,15 @@
                 'a[href*="facebook.com/"]'
             )]
             .find(el =>
+
                 !el.href.includes(
                     'l.facebook.com'
                 ) &&
+
                 !el.href.includes(
                     '/ads/library'
                 )
+
             );
 
 
@@ -1829,6 +1956,10 @@
         }
 
 
+        // ====================================================
+        // BOTÃO FECHAR
+        // ====================================================
+
         const btnFechar =
             criarBotao(
                 '❌ Fechar',
@@ -2039,7 +2170,8 @@
 
 
 // ============================================================
-// SCRIPT 03 - OTIMIZAR RAM
+// SCRIPT 03
+// OTIMIZAR RAM
 // ============================================================
 
 (function () {
@@ -2061,6 +2193,10 @@
     const STYLE_ID =
         'ads-library-memory-optimizer';
 
+
+    // ========================================================
+    // CSS
+    // ========================================================
 
     function injectCSS() {
 
@@ -2127,6 +2263,10 @@
     }
 
 
+    // ========================================================
+    // OTIMIZAR VÍDEOS
+    // ========================================================
+
     function optimizeVideos() {
 
         const videos =
@@ -2157,6 +2297,10 @@
 
     }
 
+
+    // ========================================================
+    // OTIMIZAR IMAGENS
+    // ========================================================
 
     function optimizeImages() {
 
@@ -2192,6 +2336,10 @@
 
     }
 
+
+    // ========================================================
+    // RODAR OTIMIZAÇÕES
+    // ========================================================
 
     function runOptimizations() {
 
@@ -2269,3 +2417,4 @@
     );
 
 })();
+```
