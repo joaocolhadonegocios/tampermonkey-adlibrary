@@ -1,7 +1,6 @@
-
 // ============================================================
 // AUTO ADS LIBRARY
-// ATUALIZADO 30.08.2026
+// ATUALIZADO 19.09.2026
 // ============================================================
 
 (() => {
@@ -20,6 +19,10 @@
         clearInterval(window.AUTO_ADS.limitMonitor);
     }
 
+    if (window.AUTO_ADS?.actionTimeout) {
+        clearTimeout(window.AUTO_ADS.actionTimeout);
+    }
+
     if (window.autoAdsToastTimer) {
         clearTimeout(window.autoAdsToastTimer);
     }
@@ -35,41 +38,58 @@
 
     const mostrarMensagem = (texto) => {
 
-        let toast = document.getElementById("auto-ads-toast");
+        let toast =
+            document.getElementById("auto-ads-toast");
 
         if (!toast) {
 
-            toast = document.createElement("div");
+            toast =
+                document.createElement("div");
 
-            toast.id = "auto-ads-toast";
+            toast.id =
+                "auto-ads-toast";
 
-            Object.assign(toast.style, {
-                position: "fixed",
-                top: "20px",
-                right: "20px",
-                zIndex: "2147483647",
-                padding: "12px 18px",
-                background: "#111",
-                color: "#fff",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontFamily: "Arial, sans-serif",
-                boxShadow: "0 4px 12px rgba(0,0,0,.3)",
-                transition: "opacity .2s",
-                pointerEvents: "none"
-            });
+            Object.assign(
+                toast.style,
+                {
+                    position: "fixed",
+                    top: "20px",
+                    right: "20px",
+                    zIndex: "2147483647",
+                    padding: "12px 18px",
+                    background: "#111",
+                    color: "#fff",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "Arial, sans-serif",
+                    boxShadow: "0 4px 12px rgba(0,0,0,.3)",
+                    transition: "opacity .2s",
+                    pointerEvents: "none"
+                }
+            );
 
-            document.body.appendChild(toast);
+            document.body.appendChild(
+                toast
+            );
         }
 
-        toast.textContent = texto;
-        toast.style.opacity = "1";
+        toast.textContent =
+            texto;
 
-        clearTimeout(window.autoAdsToastTimer);
+        toast.style.opacity =
+            "1";
 
-        window.autoAdsToastTimer = setTimeout(() => {
-            toast.style.opacity = "0";
-        }, 2500);
+        clearTimeout(
+            window.autoAdsToastTimer
+        );
+
+        window.autoAdsToastTimer =
+            setTimeout(() => {
+
+                toast.style.opacity =
+                    "0";
+
+            }, 2500);
     };
 
 
@@ -83,10 +103,18 @@
 
         limitMonitor: null,
 
+        actionTimeout: null,
+
+        executando: false,
+
         intervalo: 3000,
 
+        // ====================================================
+        // LIMITE PADRÃO = 3500
+        // ====================================================
+
         limite: parseInt(
-            localStorage.getItem("autoAdsLimite") || "3000",
+            localStorage.getItem("autoAdsLimite") || "3500",
             10
         ),
 
@@ -97,7 +125,8 @@
 
         formatarNumero(numero) {
 
-            return Number(numero).toLocaleString("pt-BR");
+            return Number(numero)
+                .toLocaleString("pt-BR");
 
         },
 
@@ -108,41 +137,46 @@
 
         obterQuantidadeAnuncios() {
 
-            /*
-             * O Facebook altera o contador conforme o conteúdo
-             * é carregado durante o scroll.
-             *
-             * Procuramos primeiro pelo seletor conhecido.
-             */
+            let badge =
+                document.querySelector(
+                    "#filtered-ads-toggle-btn .ui-btn-badge"
+                );
 
-            let badge = document.querySelector(
-                "#filtered-ads-toggle-btn .ui-btn-badge"
-            );
-
-            /*
-             * Fallback caso o Facebook altere levemente
-             * a estrutura do elemento.
-             */
 
             if (!badge) {
 
-                badge = document.querySelector(
-                    "#filtered-ads-toggle-btn"
-                );
+                badge =
+                    document.querySelector(
+                        "#filtered-ads-toggle-btn"
+                    );
 
             }
+
 
             if (!badge) {
                 return null;
             }
 
+
             const texto = (
+
                 badge.textContent ||
+
                 badge.innerText ||
+
                 ""
+
             ).trim();
 
+
+            if (!texto) {
+                return null;
+            }
+
+
             /*
+             * FORMATO PRINCIPAL
+             *
              * Exemplos:
              *
              * 92/92
@@ -150,41 +184,117 @@
              * 3.000/3.000
              * 4000/4000
              *
-             * Pegamos sempre o SEGUNDO número.
+             * Mantemos o comportamento original:
+             * pegar o SEGUNDO número.
              */
 
-            const match = texto.match(
-                /\/\s*([\d.,]+)/
-            );
+            const matchBarra =
+                texto.match(
+                    /\/\s*([\d.,]+)/
+                );
 
-            if (!match) {
-                return null;
+
+            if (matchBarra) {
+
+                let numeroTexto =
+                    matchBarra[1];
+
+                numeroTexto =
+                    numeroTexto
+                        .replace(/\./g, "")
+                        .replace(/,/g, "");
+
+                const numero =
+                    parseInt(
+                        numeroTexto,
+                        10
+                    );
+
+                if (!isNaN(numero)) {
+                    return numero;
+                }
+
             }
 
-            let numeroTexto = match[1];
 
             /*
-             * pt-BR:
-             * 3.000 -> 3000
-             * 1.245 -> 1245
+             * FALLBACK
              *
-             * Também suporta números sem separador.
+             * Caso o Facebook altere o formato para algo como:
+             *
+             * "1–100 de 3.500"
+             *
+             * usamos o segundo número.
              */
 
-            numeroTexto = numeroTexto
-                .replace(/\./g, "")
-                .replace(/,/g, "");
+            const matchDe =
+                texto.match(
+                    /(?:de|of)\s*([\d.,]+)/i
+                );
 
-            const numero = parseInt(
-                numeroTexto,
-                10
-            );
 
-            if (isNaN(numero)) {
-                return null;
+            if (matchDe) {
+
+                let numeroTexto =
+                    matchDe[1];
+
+                numeroTexto =
+                    numeroTexto
+                        .replace(/\./g, "")
+                        .replace(/,/g, "");
+
+                const numero =
+                    parseInt(
+                        numeroTexto,
+                        10
+                    );
+
+                if (!isNaN(numero)) {
+                    return numero;
+                }
+
             }
 
-            return numero;
+
+            /*
+             * OUTRO FALLBACK
+             *
+             * Exemplos:
+             *
+             * "3500 resultados"
+             * "3.500 anúncios"
+             */
+
+            const matchResultado =
+                texto.match(
+                    /([\d.,]+)\s*(?:resultados?|anúncios?)/i
+                );
+
+
+            if (matchResultado) {
+
+                let numeroTexto =
+                    matchResultado[1];
+
+                numeroTexto =
+                    numeroTexto
+                        .replace(/\./g, "")
+                        .replace(/,/g, "");
+
+                const numero =
+                    parseInt(
+                        numeroTexto,
+                        10
+                    );
+
+                if (!isNaN(numero)) {
+                    return numero;
+                }
+
+            }
+
+
+            return null;
         },
 
 
@@ -197,32 +307,77 @@
             const quantidade =
                 this.obterQuantidadeAnuncios();
 
+
+            /*
+             * IMPORTANTE:
+             *
+             * Se o contador não puder ser lido,
+             * NÃO deixamos a automação continuar cegamente.
+             *
+             * Isso evita justamente o problema de ficar
+             * rolando e clicando infinitamente quando o
+             * Facebook muda o DOM.
+             */
+
             if (quantidade === null) {
-                return false;
-            }
 
-            if (quantidade >= this.limite) {
-
-                if (this.timer) {
-
-                    clearInterval(this.timer);
-
-                    this.timer = null;
-
-                    mostrarMensagem(
-                        `🛑 Limite atingido: ${this.formatarNumero(quantidade)} anúncios`
-                    );
-
-                    console.log(
-                        "[AUTO ADS] Limite atingido:",
-                        quantidade,
-                        "de",
-                        this.limite
-                    );
-                }
+                console.warn(
+                    "[AUTO ADS] Não foi possível ler o contador da Ads Library."
+                );
 
                 return true;
             }
+
+
+            if (
+                quantidade >=
+                this.limite
+            ) {
+
+                if (this.timer) {
+
+                    clearInterval(
+                        this.timer
+                    );
+
+                    this.timer =
+                        null;
+
+                }
+
+
+                if (this.actionTimeout) {
+
+                    clearTimeout(
+                        this.actionTimeout
+                    );
+
+                    this.actionTimeout =
+                        null;
+
+                }
+
+
+                this.executando =
+                    false;
+
+
+                mostrarMensagem(
+                    `🛑 Limite atingido: ${this.formatarNumero(quantidade)} anúncios`
+                );
+
+
+                console.log(
+                    "[AUTO ADS] Limite atingido:",
+                    quantidade,
+                    "de",
+                    this.limite
+                );
+
+
+                return true;
+            }
+
 
             return false;
         },
@@ -234,53 +389,192 @@
 
         executar() {
 
+            /*
+             * Impede duas execuções simultâneas.
+             */
+
+            if (this.executando) {
+                return;
+            }
+
+
+            /*
+             * Verifica o limite antes de qualquer ação.
+             */
+
             if (this.verificarLimite()) {
                 return;
             }
 
-            window.scrollBy({
-                top: 1200,
-                behavior: "smooth"
-            });
+
+            this.executando =
+                true;
+
 
             /*
-             * Pequeno atraso para dar tempo ao Facebook
-             * de atualizar o DOM depois do scroll.
+             * SCROLL
              */
 
-            setTimeout(() => {
+            window.scrollBy({
 
-                if (this.verificarLimite()) {
-                    return;
-                }
+                top: 1200,
 
-                document
-                    .querySelectorAll(
-                        'a[role="button"], button, div[role="button"], span'
-                    )
-                    .forEach(el => {
+                /*
+                 * Mantido smooth para preservar
+                 * o comportamento visual original.
+                 */
+
+                behavior: "smooth"
+
+            });
+
+
+            /*
+             * Cancela qualquer timeout anterior
+             * que eventualmente ainda exista.
+             */
+
+            if (this.actionTimeout) {
+
+                clearTimeout(
+                    this.actionTimeout
+                );
+
+            }
+
+
+            /*
+             * Aguarda o DOM atualizar após o scroll.
+             */
+
+            this.actionTimeout =
+                setTimeout(() => {
+
+                    this.actionTimeout =
+                        null;
+
+
+                    /*
+                     * Reconfere o limite antes
+                     * de clicar em "Ver mais".
+                     */
+
+                    if (
+                        this.verificarLimite()
+                    ) {
+
+                        this.executando =
+                            false;
+
+                        return;
+
+                    }
+
+
+                    /*
+                     * Procura apenas o primeiro
+                     * "Ver mais".
+                     *
+                     * O código antigo clicava em TODOS.
+                     * Isso podia gerar uma sequência enorme
+                     * de carregamentos simultâneos.
+                     */
+
+                    const elementos =
+                        document.querySelectorAll(
+                            'a[role="button"], button, div[role="button"], span'
+                        );
+
+
+                    let clicou =
+                        false;
+
+
+                    for (
+                        const el of elementos
+                    ) {
 
                         const texto = (
-                            el.innerText || ""
+
+                            el.innerText ||
+
+                            el.textContent ||
+
+                            ""
+
                         )
                             .trim()
                             .toLowerCase();
 
+
                         if (
+
                             texto === "ver mais" ||
-                            texto.startsWith("ver mais") ||
-                            texto.includes("ver mais")
+
+                            texto.startsWith(
+                                "ver mais"
+                            ) ||
+
+                            texto.includes(
+                                "ver mais"
+                            )
+
                         ) {
 
                             try {
+
                                 el.click();
-                            } catch {}
+
+                                clicou =
+                                    true;
+
+                                console.log(
+                                    "[AUTO ADS] Ver Mais clicado."
+                                );
+
+                            } catch (erro) {
+
+                                console.warn(
+                                    "[AUTO ADS] Erro ao clicar em Ver Mais:",
+                                    erro
+                                );
+
+                            }
+
+
+                            /*
+                             * SOMENTE UM POR CICLO.
+                             */
+
+                            break;
 
                         }
 
-                    });
+                    }
 
-            }, 350);
+
+                    this.executando =
+                        false;
+
+
+                    /*
+                     * Pequeno monitoramento após
+                     * o clique para detectar rapidamente
+                     * se o limite foi alcançado.
+                     */
+
+                    if (clicou) {
+
+                        setTimeout(() => {
+
+                            this.verificarLimite();
+
+                        }, 500);
+
+                    }
+
+
+                }, 350);
 
         },
 
@@ -291,9 +585,12 @@
 
         iniciar() {
 
-            if (this.verificarLimite()) {
+            if (
+                this.verificarLimite()
+            ) {
                 return;
             }
+
 
             if (this.timer) {
 
@@ -302,17 +599,27 @@
                 );
 
                 return;
+
             }
 
-            this.timer = setInterval(() => {
 
-                this.executar();
+            this.timer =
+                setInterval(() => {
 
-            }, this.intervalo);
+                    this.executar();
+
+                }, this.intervalo);
+
 
             mostrarMensagem(
                 `🚀 Iniciado (${this.intervalo / 1000}s) | Limite ${this.formatarNumero(this.limite)}`
             );
+
+
+            console.log(
+                "[AUTO ADS] Iniciado."
+            );
+
         },
 
 
@@ -322,22 +629,51 @@
 
         parar() {
 
-            if (!this.timer) {
+            /*
+             * SEMPRE cancela o intervalo.
+             */
 
-                mostrarMensagem(
-                    "Já parado"
+            if (this.timer) {
+
+                clearInterval(
+                    this.timer
                 );
 
-                return;
+                this.timer =
+                    null;
+
             }
 
-            clearInterval(this.timer);
 
-            this.timer = null;
+            /*
+             * Cancela o "Ver Mais" agendado.
+             */
+
+            if (this.actionTimeout) {
+
+                clearTimeout(
+                    this.actionTimeout
+                );
+
+                this.actionTimeout =
+                    null;
+
+            }
+
+
+            this.executando =
+                false;
+
 
             mostrarMensagem(
                 "🛑 Parado"
             );
+
+
+            console.log(
+                "[AUTO ADS] Parado."
+            );
+
         },
 
 
@@ -350,23 +686,31 @@
             const atual =
                 this.intervalo / 1000;
 
-            const valor = prompt(
-                `Velocidade atual: ${atual}s\n\nDigite a nova velocidade em segundos:`,
-                atual
-            );
+
+            const valor =
+                prompt(
+                    `Velocidade atual: ${atual}s\n\nDigite a nova velocidade em segundos:`,
+                    atual
+                );
+
 
             if (valor === null) {
                 return;
             }
+
 
             const segundos =
                 parseFloat(
                     valor.replace(",", ".")
                 );
 
+
             if (
+
                 isNaN(segundos) ||
+
                 segundos <= 0
+
             ) {
 
                 mostrarMensagem(
@@ -374,13 +718,17 @@
                 );
 
                 return;
+
             }
+
 
             this.intervalo =
                 segundos * 1000;
 
+
             const estavaRodando =
                 !!this.timer;
+
 
             if (estavaRodando) {
 
@@ -388,20 +736,25 @@
                     this.timer
                 );
 
-                this.timer = null;
+                this.timer =
+                    null;
 
                 this.iniciar();
+
             }
+
 
             mostrarMensagem(
                 `⚡ Velocidade: ${segundos}s`
             );
+
 
             console.log(
                 "[AUTO ADS] Intervalo atualizado:",
                 segundos,
                 "segundos"
             );
+
         },
 
 
@@ -415,41 +768,60 @@
                 return null;
             }
 
+
             let texto =
                 String(valor)
                     .trim()
                     .toLowerCase()
                     .replace(/\s/g, "");
 
+
             // -----------------------------------------------
             // 3k / 4k / 10k
             // -----------------------------------------------
 
-            if (texto.endsWith("k")) {
+            if (
+                texto.endsWith("k")
+            ) {
 
                 const numero =
                     parseFloat(
-                        texto.slice(0, -1).replace(",", ".")
+                        texto
+                            .slice(0, -1)
+                            .replace(",", ".")
                     );
 
+
                 if (
+
                     isNaN(numero) ||
+
                     numero <= 0
+
                 ) {
+
                     return null;
+
                 }
+
 
                 return Math.round(
                     numero * 1000
                 );
+
             }
+
 
             // -----------------------------------------------
             // 3000 / 3.000 / 10000
             // -----------------------------------------------
 
             texto =
-                texto.replace(/\./g, "");
+                texto.replace(
+                    /\./g,
+                    ""
+                );
+
 
             const numero =
                 parseInt(
@@ -457,14 +829,22 @@
                     10
                 );
 
+
             if (
+
                 isNaN(numero) ||
+
                 numero <= 0
+
             ) {
+
                 return null;
+
             }
 
+
             return numero;
+
         },
 
 
@@ -479,21 +859,31 @@
                     this.limite
                 );
 
-            const valor = prompt(
-                `Limite atual: ${atual} anúncios\n\nDigite o novo limite:\n\nExemplos: 3000, 3k, 4k, 5000`,
-                atual
-            );
+
+            const valor =
+                prompt(
+                    `Limite atual: ${atual} anúncios\n\nDigite o novo limite:\n\nExemplos: 3500, 3.5k, 4k, 5000`,
+                    atual
+                );
+
 
             if (valor === null) {
                 return;
             }
 
+
             const novoLimite =
-                this.converterLimite(valor);
+                this.converterLimite(
+                    valor
+                );
+
 
             if (
+
                 novoLimite === null ||
+
                 novoLimite < 1
+
             ) {
 
                 mostrarMensagem(
@@ -501,28 +891,36 @@
                 );
 
                 return;
+
             }
+
 
             this.limite =
                 novoLimite;
+
 
             localStorage.setItem(
                 "autoAdsLimite",
                 String(novoLimite)
             );
 
+
             atualizarTextoLimite();
+
 
             mostrarMensagem(
                 `🔢 Limite definido: ${this.formatarNumero(novoLimite)}`
             );
+
 
             console.log(
                 "[AUTO ADS] Novo limite:",
                 novoLimite
             );
 
+
             this.verificarLimite();
+
         },
 
 
@@ -532,12 +930,16 @@
 
         iniciarMonitorLimite() {
 
-            if (this.limitMonitor) {
+            if (
+                this.limitMonitor
+            ) {
 
                 clearInterval(
                     this.limitMonitor
                 );
+
             }
+
 
             this.limitMonitor =
                 setInterval(() => {
@@ -545,6 +947,7 @@
                     this.verificarLimite();
 
                 }, 500);
+
         }
 
     };
@@ -557,48 +960,48 @@
     const popup =
         document.createElement("div");
 
+
     popup.id =
         "auto-ads-popup";
 
-    Object.assign(popup.style, {
 
-        /*
-         * IMPORTANTE:
-         * Agora fica AO LADO do painel laranja.
-         * Não fica mais em cima dele.
-         */
+    Object.assign(
+        popup.style,
+        {
 
-        position: "fixed",
+            position: "fixed",
 
-        bottom: "20px",
+            bottom: "20px",
 
-        right: "105px",
+            right: "105px",
 
-        width: "210px",
+            width: "210px",
 
-        background: "#111",
+            background: "#111",
 
-        color: "#fff",
+            color: "#fff",
 
-        borderRadius: "12px",
+            borderRadius: "12px",
 
-        padding: "10px",
+            padding: "10px",
 
-        zIndex: "2147483646",
+            zIndex: "2147483646",
 
-        boxShadow:
-            "0 6px 20px rgba(0,0,0,.4)",
+            boxShadow:
+                "0 6px 20px rgba(0,0,0,.4)",
 
-        fontFamily:
-            "Arial, sans-serif",
+            fontFamily:
+                "Arial, sans-serif",
 
-        display: "none",
+            display: "none",
 
-        boxSizing: "border-box",
+            boxSizing: "border-box",
 
-        border: "1px solid rgba(255,255,255,.08)"
+            border:
+                "1px solid rgba(255,255,255,.08)"
 
-    });
+        }
+    );
 
 
     popup.innerHTML = `
@@ -631,31 +1034,34 @@
         .querySelectorAll("button")
         .forEach(button => {
 
-            Object.assign(button.style, {
+            Object.assign(
+                button.style,
+                {
 
-                width: "100%",
+                    width: "100%",
 
-                border: "none",
+                    border: "none",
 
-                background: "#222",
+                    background: "#222",
 
-                color: "#fff",
+                    color: "#fff",
 
-                padding: "10px",
+                    padding: "10px",
 
-                marginBottom: "6px",
+                    marginBottom: "6px",
 
-                borderRadius: "7px",
+                    borderRadius: "7px",
 
-                cursor: "pointer",
+                    cursor: "pointer",
 
-                fontSize: "12px",
+                    fontSize: "12px",
 
-                textAlign: "left",
+                    textAlign: "left",
 
-                boxSizing: "border-box"
+                    boxSizing: "border-box"
 
-            });
+                }
+            );
 
 
             button.addEventListener(
@@ -698,12 +1104,15 @@
                 "auto-ads-limit-btn"
             );
 
+
         if (!button) {
             return;
         }
 
+
         button.textContent =
             `🔢 Limite: ${window.AUTO_ADS.formatarNumero(window.AUTO_ADS.limite)}`;
+
     }
 
 
@@ -712,7 +1121,9 @@
     // ========================================================
 
     document
-        .getElementById("auto-ads-speed-btn")
+        .getElementById(
+            "auto-ads-speed-btn"
+        )
         .addEventListener(
             "click",
             (e) => {
@@ -721,7 +1132,8 @@
 
                 e.stopPropagation();
 
-                window.AUTO_ADS.alterarVelocidade();
+                window.AUTO_ADS
+                    .alterarVelocidade();
 
             }
         );
@@ -732,7 +1144,9 @@
     // ========================================================
 
     document
-        .getElementById("auto-ads-limit-btn")
+        .getElementById(
+            "auto-ads-limit-btn"
+        )
         .addEventListener(
             "click",
             (e) => {
@@ -741,7 +1155,8 @@
 
                 e.stopPropagation();
 
-                window.AUTO_ADS.alterarLimite();
+                window.AUTO_ADS
+                    .alterarLimite();
 
             }
         );
@@ -751,57 +1166,57 @@
     // BOTÃO FLUTUANTE AUTO ADS
     // ========================================================
 
-    /*
-     * Mantido como fallback.
-     * O painel laranja também abre o mesmo popup.
-     */
-
     const btn =
         document.createElement("div");
 
+
     btn.id =
         "auto-ads-config-btn";
+
 
     btn.innerHTML =
         "⚙";
 
 
-    Object.assign(btn.style, {
+    Object.assign(
+        btn.style,
+        {
 
-        position: "fixed",
+            position: "fixed",
 
-        bottom: "20px",
+            bottom: "20px",
 
-        right: "20px",
+            right: "20px",
 
-        width: "50px",
+            width: "50px",
 
-        height: "50px",
+            height: "50px",
 
-        borderRadius: "50%",
+            borderRadius: "50%",
 
-        background: "#ff3b30",
+            background: "#ff3b30",
 
-        color: "#fff",
+            color: "#fff",
 
-        display: "none",
+            display: "none",
 
-        alignItems: "center",
+            alignItems: "center",
 
-        justifyContent: "center",
+            justifyContent: "center",
 
-        fontSize: "24px",
+            fontSize: "24px",
 
-        cursor: "pointer",
+            cursor: "pointer",
 
-        zIndex: "2147483647",
+            zIndex: "2147483647",
 
-        boxShadow:
-            "0 4px 12px rgba(0,0,0,.4)",
+            boxShadow:
+                "0 4px 12px rgba(0,0,0,.4)",
 
-        userSelect: "none"
+            userSelect: "none"
 
-    });
+        }
+    );
 
 
     btn.title =
@@ -815,6 +1230,7 @@
             e.preventDefault();
 
             e.stopPropagation();
+
 
             popup.style.display =
                 popup.style.display === "none"
@@ -841,15 +1257,23 @@
             const alvo =
                 e.target;
 
+
             if (
+
                 popup.contains(alvo) ||
+
                 alvo === btn ||
+
                 document
                     .getElementById("mw-gear")
                     ?.contains(alvo)
+
             ) {
+
                 return;
+
             }
+
 
             popup.style.display =
                 "none";
@@ -870,25 +1294,37 @@
             const tecla =
                 e.key.toLowerCase();
 
+
             if (
-                ["input", "textarea"].includes(
-                    document.activeElement
-                        ?.tagName
-                        ?.toLowerCase()
-                )
+                ["input", "textarea"]
+                    .includes(
+                        document.activeElement
+                            ?.tagName
+                            ?.toLowerCase()
+                    )
             ) {
+
                 return;
-            }
-
-            if (tecla === "p") {
-
-                window.AUTO_ADS.parar();
 
             }
 
-            if (tecla === "ç") {
 
-                window.AUTO_ADS.iniciar();
+            if (
+                tecla === "p"
+            ) {
+
+                window.AUTO_ADS
+                    .parar();
+
+            }
+
+
+            if (
+                tecla === "ç"
+            ) {
+
+                window.AUTO_ADS
+                    .iniciar();
 
             }
 
@@ -900,12 +1336,14 @@
     // MONITORAMENTO
     // ========================================================
 
-    window.AUTO_ADS.iniciarMonitorLimite();
+    window.AUTO_ADS
+        .iniciarMonitorLimite();
 
 
     mostrarMensagem(
         `Ativado | Ç iniciar | P parar | ⚙ configurações | Limite ${window.AUTO_ADS.formatarNumero(window.AUTO_ADS.limite)}`
     );
+
 
 })();
 
@@ -1128,10 +1566,12 @@
                     'meuFiltroWhatsapp'
                 ) === '1';
 
+
             ball.style.left =
                 ligado
                     ? '28px'
                     : '2px';
+
         }
 
 
@@ -1150,28 +1590,54 @@
 
                 e.stopPropagation();
 
+
                 const ligado =
                     localStorage.getItem(
                         'meuFiltroWhatsapp'
                     ) === '1';
 
 
-                localStorage.setItem(
-                    'meuFiltroWhatsapp',
+                const novoEstado =
                     ligado
                         ? '0'
-                        : '1'
+                        : '1';
+
+
+                localStorage.setItem(
+                    'meuFiltroWhatsapp',
+                    novoEstado
                 );
 
 
                 atualizar();
 
 
-                alert(
-                    ligado
-                        ? 'Filtro WhatsApp DESATIVADO'
-                        : 'Filtro WhatsApp ATIVADO'
-                );
+                // ============================================
+                // ATIVOU O FILTRO
+                // ============================================
+
+                if (
+                    novoEstado === '1'
+                ) {
+
+                    /*
+                     * Faz uma varredura IMEDIATA nos cards
+                     * que já estão carregados na página.
+                     */
+
+                    scan();
+
+                    alert(
+                        'Filtro WhatsApp ATIVADO'
+                    );
+
+                } else {
+
+                    alert(
+                        'Filtro WhatsApp DESATIVADO'
+                    );
+
+                }
 
             }
         );
@@ -1189,10 +1655,12 @@
 
                 e.stopPropagation();
 
+
                 const popup =
                     document.getElementById(
                         "auto-ads-popup"
                     );
+
 
                 if (!popup) {
 
@@ -1201,6 +1669,7 @@
                     );
 
                     return;
+
                 }
 
 
@@ -1384,7 +1853,8 @@
                 .trim();
 
 
-        let pageId = null;
+        let pageId =
+            null;
 
 
         try {
@@ -1497,7 +1967,7 @@
 
 
     // ========================================================
-    // FILTRO WHATSAPP
+    // FILTRO WHATSAPP ATIVO?
     // ========================================================
 
     function filtroWhatsappAtivo() {
@@ -1511,44 +1981,93 @@
     }
 
 
-    function ehLinkWhatsapp(url) {
+    // ========================================================
+    // DETECTAR API.WHATSAPP.COM
+    // ========================================================
+
+    function ehUrlWhatsapp(url) {
 
         if (!url) {
             return false;
         }
 
 
-        url =
-            url.toLowerCase();
+        return String(url)
+            .toLowerCase()
+            .includes(
+                'api.whatsapp.com'
+            );
+
+    }
 
 
-        return (
+    // ========================================================
+    // DETECTAR URL DE EXIBIÇÃO NO CARD
+    // ========================================================
 
-            url.startsWith(
-                'https://api.whatsapp.com/send'
-            ) ||
+    function cardTemUrlWhatsapp(card) {
 
-            url.startsWith(
-                'http://api.whatsapp.com/send'
-            ) ||
+        /*
+         * A URL de exibição normalmente aparece
+         * como texto dentro do próprio card.
+         *
+         * Por isso verificamos o texto completo
+         * do anúncio.
+         */
 
-            url.startsWith(
-                'https://wa.me/'
-            ) ||
+        const texto =
+            (
 
-            url.startsWith(
-                'http://wa.me/'
-            ) ||
+                card.innerText ||
 
-            url.includes(
-                'whatsapp.com/send'
-            ) ||
+                card.textContent ||
 
-            url.includes(
-                'wa.me/'
+                ''
+
             )
+            .toLowerCase();
 
-        );
+
+        if (
+            texto.includes(
+                'api.whatsapp.com'
+            )
+        ) {
+
+            return true;
+
+        }
+
+
+        /*
+         * Também verificamos os hrefs presentes
+         * dentro do card como fallback.
+         */
+
+        const links =
+            card.querySelectorAll(
+                'a[href]'
+            );
+
+
+        for (
+            const link of links
+        ) {
+
+            if (
+                ehUrlWhatsapp(
+                    link.href
+                )
+            ) {
+
+                return true;
+
+            }
+
+        }
+
+
+        return false;
 
     }
 
@@ -1703,6 +2222,23 @@
             card;
 
 
+        /*
+         * Evita tentar fechar o mesmo card várias vezes.
+         */
+
+        if (
+            container.dataset.autoWhatsappRemovendo === '1'
+        ) {
+
+            return;
+
+        }
+
+
+        container.dataset.autoWhatsappRemovendo =
+            '1';
+
+
         container.style.transition =
             'opacity .15s ease';
 
@@ -1729,61 +2265,47 @@
 
 
     // ========================================================
-    // DETECTAR WHATSAPP
-    // ========================================================
-
-    function ehAnuncioWhatsapp(card) {
-
-        const texto = (
-
-            card.innerText ||
-
-            card.textContent ||
-
-            ''
-
-        ).toUpperCase();
-
-
-        return (
-
-            texto.includes(
-                'API.WHATSAPP.COM'
-            ) ||
-
-            texto.includes(
-                'WHATSAPP.COM'
-            ) ||
-
-            texto.includes(
-                'ENVIAR MENSAGEM PELO WHATSAPP'
-            )
-
-        );
-
-    }
-
-
-    // ========================================================
     // PROCESSAR CARD
     // ========================================================
 
     function processarCard(card) {
 
+        // ====================================================
+        // FILTRO WHATSAPP
+        // ====================================================
+
         if (
 
             filtroWhatsappAtivo() &&
 
-            ehAnuncioWhatsapp(card)
+            cardTemUrlWhatsapp(card)
 
         ) {
 
-            removerAnuncio(card);
+            /*
+             * Executa a mesma função utilizada
+             * pelo botão "❌ Fechar".
+             */
+
+            removerAnuncio(
+                card
+            );
+
+
+            console.log(
+                '[FILTRO WHATSAPP] Card removido:',
+                card
+            );
+
 
             return;
 
         }
 
+
+        // ====================================================
+        // PROCESSAMENTO NORMAL
+        // ====================================================
 
         if (
             processed.has(card)
@@ -1817,11 +2339,16 @@
             );
 
 
+        /*
+         * Se a landing page for diretamente
+         * api.whatsapp.com, também remove.
+         */
+
         if (
 
             filtroWhatsappAtivo() &&
 
-            ehLinkWhatsapp(
+            ehUrlWhatsapp(
                 landing
             )
 
@@ -1848,8 +2375,11 @@
 
 
         if (
+
             !landing &&
+
             !temPageId
+
         ) {
 
             return;
@@ -2144,7 +2674,9 @@
                     scanTimeout =
                         setTimeout(
                             () => {
+
                                 scan();
+
                             },
                             300
                         );
