@@ -1354,929 +1354,384 @@
 // ============================================================
 
 (function () {
-
     'use strict';
 
-
-    // ========================================================
+    // ============================================================
     // LIMPA INSTALAÇÃO ANTERIOR
-    // ========================================================
+    // ============================================================
 
     if (window.__AUTO_WHATSAPP_FILTER_CLEANUP) {
-
         try {
             window.__AUTO_WHATSAPP_FILTER_CLEANUP();
         } catch (e) {}
-
     }
 
-
-    const processed =
-        new WeakSet();
-
-
-    let scanTimeout =
-        null;
-
-
-    // Guarda os cards que foram ocultados pelo filtro.
-    // Isso permite DESAPLICAR o filtro depois.
-    const whatsappOcultos =
-        new WeakSet();
-
-
-    // ========================================================
-    // PAINEL LARANJA
-    // ========================================================
-
-    function criarPainelFiltro() {
-
-        if (
-            document.getElementById(
-                'meu-filtro-whatsapp'
-            )
-        ) {
-            return;
-        }
-
-
-        const painel =
-            document.createElement('div');
-
-
-        painel.id =
-            'meu-filtro-whatsapp';
-
-
-        painel.innerHTML = `
-
-            <div id="mw-toggle-track">
-                <div id="mw-toggle-ball"></div>
-            </div>
-
-            <div id="mw-gear" title="Configurações Auto Ads">
-                ⚙
-            </div>
-
-        `;
-
-
-        Object.assign(
-            painel.style,
-            {
-
-                position: 'fixed',
-
-                right: '20px',
-
-                bottom: '20px',
-
-                width: '70px',
-
-                height: '110px',
-
-                background: '#ff3b30',
-
-                borderRadius: '35px',
-
-                zIndex: '2147483647',
-
-                display: 'flex',
-
-                flexDirection: 'column',
-
-                alignItems: 'center',
-
-                justifyContent: 'space-evenly',
-
-                boxShadow:
-                    '0 4px 16px rgba(0,0,0,.3)',
-
-                userSelect: 'none'
-
-            }
-        );
-
-
-        const track =
-            painel.querySelector(
-                '#mw-toggle-track'
-            );
-
-
-        const ball =
-            painel.querySelector(
-                '#mw-toggle-ball'
-            );
-
-
-        const gear =
-            painel.querySelector(
-                '#mw-gear'
-            );
-
-
-        // ====================================================
-        // ENGRENAGEM
-        // ====================================================
-
-        Object.assign(
-            gear.style,
-            {
-
-                width: '40px',
-
-                height: '34px',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                justifyContent: 'center',
-
-                fontSize: '20px',
-
-                cursor: 'pointer',
-
-                lineHeight: '1',
-
-                borderRadius: '8px',
-
-                transition:
-                    'background .15s'
-
-            }
-        );
-
-
-        gear.addEventListener(
-            'mouseenter',
-            () => {
-
-                gear.style.background =
-                    'rgba(0,0,0,.15)';
-
-            }
-        );
-
-
-        gear.addEventListener(
-            'mouseleave',
-            () => {
-
-                gear.style.background =
-                    'transparent';
-
-            }
-        );
-
-
-        // ====================================================
-        // TOGGLE
-        // ====================================================
-
-        Object.assign(
-            track.style,
-            {
-
-                width: '52px',
-
-                height: '26px',
-
-                borderRadius: '20px',
-
-                background: '#111',
-
-                position: 'relative',
-
-                cursor: 'pointer'
-
-            }
-        );
-
-
-        Object.assign(
-            ball.style,
-            {
-
-                width: '22px',
-
-                height: '22px',
-
-                borderRadius: '50%',
-
-                background: '#e6e6e6',
-
-                position: 'absolute',
-
-                top: '2px',
-
-                transition: '.2s',
-
-                boxShadow:
-                    '0 1px 3px rgba(0,0,0,.3)'
-
-            }
-        );
-
-
-        function atualizar() {
-
-            const ligado =
-                localStorage.getItem(
-                    'meuFiltroWhatsapp'
-                ) === '1';
-
-
-            ball.style.left =
-                ligado
-                    ? '28px'
-                    : '2px';
-
-        }
-
-
-        atualizar();
-
-
-        // ====================================================
-        // TOGGLE WHATSAPP
-        // ====================================================
-
-        track.addEventListener(
-            'click',
-            (e) => {
-
-                e.preventDefault();
-
-                e.stopPropagation();
-
-
-                const ligado =
-                    localStorage.getItem(
-                        'meuFiltroWhatsapp'
-                    ) === '1';
-
-
-                const novoEstado =
-                    ligado
-                        ? '0'
-                        : '1';
-
-
-                localStorage.setItem(
-                    'meuFiltroWhatsapp',
-                    novoEstado
-                );
-
-
-                atualizar();
-
-
-                // ============================================
-                // ATIVOU
-                // ============================================
-
-                if (
-                    novoEstado === '1'
-                ) {
-
-                    scan();
-
-
-                    alert(
-                        'Filtro WhatsApp ATIVADO'
-                    );
-
-                }
-
-
-                // ============================================
-                // DESATIVOU
-                // ============================================
-
-                else {
-
-                    desaplicarFiltroWhatsapp();
-
-
-                    alert(
-                        'Filtro WhatsApp DESATIVADO'
-                    );
-
-                }
-
-            }
-        );
-
-
-        // ====================================================
-        // ENGRENAGEM ABRE O POPUP
-        // ====================================================
-
-        gear.addEventListener(
-            'click',
-            (e) => {
-
-                e.preventDefault();
-
-                e.stopPropagation();
-
-
-                const popup =
-                    document.getElementById(
-                        "auto-ads-popup"
-                    );
-
-
-                if (!popup) {
-
-                    console.warn(
-                        "[AUTO ADS] Popup não encontrado."
-                    );
-
-                    return;
-
-                }
-
-
-                popup.style.display =
-                    popup.style.display === "none"
-                        ? "block"
-                        : "none";
-
-            }
-        );
-
-
-        document.body.appendChild(
-            painel
-        );
-
-    }
-
-
-    // ========================================================
-    // CSS DOS BOTÕES DOS ANÚNCIOS
-    // ========================================================
+    // ============================================================
+    // CONTROLE
+    // ============================================================
+
+    const processed = new WeakSet();
+    let scanTimeout = null;
+
+    // Guarda IDs que já foram removidos pelo filtro nesta execução.
+    // Isso evita tentar remover o mesmo anúncio repetidamente.
+    const whatsappRemovidos = new WeakSet();
+
+    // ============================================================
+    // ESTILO
+    // ============================================================
 
     function injectCSS() {
 
-        if (
-            document.getElementById(
-                'meu-ad-style'
-            )
-        ) {
-            return;
-        }
+        if (document.getElementById('auto-whatsapp-style')) return;
 
+        const style = document.createElement('style');
 
-        const style =
-            document.createElement('style');
-
-
-        style.id =
-            'meu-ad-style';
-
+        style.id = 'auto-whatsapp-style';
 
         style.textContent = `
 
+            /* =====================================================
+               BARRA DOS BOTÕES
+               ===================================================== */
+
             .meu-ad-bar {
+                display: flex !important;
+                gap: 6px !important;
+                align-items: center !important;
+                justify-content: center !important;
 
-                display: flex;
+                margin-top: 8px !important;
+                padding: 6px !important;
 
-                gap: 6px;
+                background: #f5f5f5 !important;
+                border-radius: 8px !important;
 
-                margin-top: 4px;
-
-                margin-bottom: 4px;
-
-                flex-wrap: wrap;
-
-                position: relative;
-
-                z-index: 9999;
-
+                position: relative !important;
+                z-index: 9999 !important;
             }
-
 
             .meu-ad-btn {
+                border: none !important;
+                border-radius: 6px !important;
 
-                all: unset;
+                padding: 6px 9px !important;
 
-                cursor: pointer;
+                font-size: 12px !important;
+                font-weight: 600 !important;
 
-                padding: 5px 8px;
+                cursor: pointer !important;
 
-                font-size: 11px;
+                color: white !important;
 
-                border-radius: 5px;
-
-                background: #f0f2f5;
-
-                border: 1px solid rgba(0,0,0,0.12);
-
-                display: inline-flex;
-
-                align-items: center;
-
-                white-space: nowrap;
-
-                user-select: none;
-
-                box-sizing: border-box;
-
+                transition: opacity .15s ease !important;
             }
 
-
             .meu-ad-btn:hover {
+                opacity: .8 !important;
+            }
 
-                background: #e4e6eb;
+            .meu-ad-site {
+                background: #1877f2 !important;
+            }
 
+            .meu-ad-ads {
+                background: #4267B2 !important;
+            }
+
+            .meu-ad-img {
+                background: #00a884 !important;
+            }
+
+            .meu-ad-video {
+                background: #e91e63 !important;
+            }
+
+            .meu-ad-close {
+                background: #ff3b30 !important;
+            }
+
+            /* =====================================================
+               PAINEL
+               ===================================================== */
+
+            #auto-whatsapp-panel {
+                position: fixed !important;
+
+                right: 20px !important;
+                bottom: 20px !important;
+
+                width: 70px !important;
+                height: 110px !important;
+
+                background: #ff3b30 !important;
+
+                border-radius: 35px !important;
+
+                z-index: 2147483647 !important;
+
+                display: flex !important;
+                flex-direction: column !important;
+
+                align-items: center !important;
+                justify-content: center !important;
+
+                box-shadow: 0 4px 15px rgba(0,0,0,.25) !important;
+
+                user-select: none !important;
+            }
+
+            #auto-whatsapp-title {
+                color: white !important;
+
+                font-size: 11px !important;
+                font-weight: 700 !important;
+
+                margin-bottom: 7px !important;
+
+                text-align: center !important;
+            }
+
+            #auto-whatsapp-toggle {
+                width: 52px !important;
+                height: 26px !important;
+
+                border-radius: 15px !important;
+
+                background: rgba(255,255,255,.35) !important;
+
+                position: relative !important;
+
+                cursor: pointer !important;
+            }
+
+            #auto-whatsapp-ball {
+                width: 22px !important;
+                height: 22px !important;
+
+                border-radius: 50% !important;
+
+                background: white !important;
+
+                position: absolute !important;
+
+                top: 2px !important;
+                left: 2px !important;
+
+                transition: left .2s ease !important;
+
+                box-shadow: 0 1px 4px rgba(0,0,0,.25) !important;
+            }
+
+            #auto-whatsapp-gear {
+                color: white !important;
+
+                font-size: 14px !important;
+
+                margin-top: 8px !important;
+
+                cursor: pointer !important;
+
+                opacity: .9 !important;
             }
 
         `;
 
-
-        document.head.appendChild(
-            style
-        );
-
+        document.head.appendChild(style);
     }
 
+    // ============================================================
+    // FILTRO WHATSAPP — ESTADO
+    // ============================================================
 
-    // ========================================================
-    // CRIAR BOTÃO
-    // ========================================================
+    function filtroWhatsappAtivo() {
+        return localStorage.getItem('meuFiltroWhatsapp') === '1';
+    }
 
-    function criarBotao(
-        texto,
-        onClick
-    ) {
+    // ============================================================
+    // PAINEL
+    // ============================================================
 
-        const btn =
-            document.createElement(
-                'button'
-            );
+    function criarPainelFiltro() {
 
+        const antigo = document.getElementById('auto-whatsapp-panel');
 
-        btn.className =
-            'meu-ad-btn';
+        if (antigo) antigo.remove();
 
+        const panel = document.createElement('div');
 
-        btn.textContent =
-            texto;
+        panel.id = 'auto-whatsapp-panel';
 
+        panel.innerHTML = `
 
-        btn.addEventListener(
-            'click',
-            (e) => {
+            <div id="auto-whatsapp-title">
+                WhatsApp
+            </div>
 
-                e.preventDefault();
+            <div id="auto-whatsapp-toggle">
 
-                e.stopPropagation();
+                <div id="auto-whatsapp-ball"></div>
 
-                onClick();
+            </div>
+
+            <div id="auto-whatsapp-gear">
+                ⚙️
+            </div>
+
+        `;
+
+        document.body.appendChild(panel);
+
+        const toggle = document.getElementById('auto-whatsapp-toggle');
+        const ball = document.getElementById('auto-whatsapp-ball');
+
+        function atualizarToggle() {
+
+            if (filtroWhatsappAtivo()) {
+
+                ball.style.left = '28px';
+
+            } else {
+
+                ball.style.left = '2px';
 
             }
-        );
+        }
 
+        atualizarToggle();
 
-        return btn;
+        toggle.addEventListener('click', function () {
+
+            const ativo = filtroWhatsappAtivo();
+
+            if (ativo) {
+
+                localStorage.setItem('meuFiltroWhatsapp', '0');
+
+                atualizarToggle();
+
+                alert('Filtro WhatsApp DESATIVADO');
+
+            } else {
+
+                localStorage.setItem('meuFiltroWhatsapp', '1');
+
+                atualizarToggle();
+
+                // Executa imediatamente nos cards atuais
+                scan();
+
+                alert('Filtro WhatsApp ATIVADO');
+
+            }
+
+        });
+
+        const gear = document.getElementById('auto-whatsapp-gear');
+
+        gear.addEventListener('click', function () {
+
+            alert(
+                'Filtro WhatsApp\\n\\n' +
+                'Quando ativado, anúncios cujo link exibido é api.whatsapp.com ' +
+                'serão fechados automaticamente.'
+            );
+
+        });
 
     }
 
+    // ============================================================
+    // IDENTIFICA AD ID DO CARD
+    // ============================================================
 
-    // ========================================================
-    // EXTRAIR PÁGINA
-    // ========================================================
+    function extrairAdId(card) {
 
-    function extrairPagina(card) {
-
-        const a =
-            [...card.querySelectorAll(
-                'a[href*="facebook.com/"]'
-            )]
-            .find(el =>
-
-                !el.href.includes(
-                    'l.facebook.com'
-                ) &&
-
-                !el.href.includes(
-                    '/ads/library'
-                )
-
-            );
-
-
-        if (!a) {
-            return null;
-        }
-
-
-        const nome =
-            (a.textContent || '')
-                .trim();
-
-
-        let pageId =
-            null;
-
+        if (!card) return null;
 
         try {
 
-            const reactKey =
-                Object.keys(card)
-                    .find(k =>
-                        k.startsWith(
-                            '__reactProps$'
-                        )
-                    );
+            // O Ads Library coloca o ID diretamente no atributo adid
+            const elementoComAdId = card.querySelector('[adid]');
 
+            if (elementoComAdId) {
 
-            if (reactKey) {
+                const id = elementoComAdId.getAttribute('adid');
 
-                const data =
-                    JSON.stringify(
-                        card[reactKey]
-                    );
+                if (id) return String(id);
 
+            }
 
-                const match =
-                    data.match(
-                        /"page_id"\s*:\s*"(\d+)"/
-                    );
+            // Caso o próprio card possua o atributo
+            const proprio = card.getAttribute('adid');
 
-
-                if (match) {
-
-                    pageId =
-                        match[1];
-
-                }
-
+            if (proprio) {
+                return String(proprio);
             }
 
         } catch (e) {}
 
-
-        if (!pageId) {
-
-            const matchHref =
-                a.href.match(
-                    /facebook\.com\/(\d+)\/?$/
-                );
-
-
-            if (matchHref) {
-
-                pageId =
-                    matchHref[1];
-
-            }
-
-        }
-
-
-        return {
-            nome,
-            url: a.href,
-            pageId
-        };
-
+        return null;
     }
 
-
-    // ========================================================
-    // EXTRAIR LANDING
-    // ========================================================
-
-    function extrairLanding(card) {
-
-        const a =
-            [...card.querySelectorAll(
-                'a[href]'
-            )]
-            .find(el =>
-                el.href.includes(
-                    'l.facebook.com/l.php?u='
-                )
-            );
-
-
-        if (!a) {
-            return null;
-        }
-
-
-        try {
-
-            const url =
-                new URL(a.href);
-
-
-            const raw =
-                url.searchParams.get('u');
-
-
-            return raw
-                ? decodeURIComponent(raw)
-                : null;
-
-        } catch {
-
-            return null;
-
-        }
-
-    }
-
-
-    // ========================================================
-    // FILTRO WHATSAPP ATIVO?
-    // ========================================================
-
-    function filtroWhatsappAtivo() {
-
-        return (
-            localStorage.getItem(
-                'meuFiltroWhatsapp'
-            ) === '1'
-        );
-
-    }
-
-
-    // ========================================================
-    // DETECTAR API.WHATSAPP.COM
-    // ========================================================
+    // ============================================================
+    // URL WHATSAPP
+    // ============================================================
 
     function ehUrlWhatsapp(url) {
 
-        if (!url) {
+        if (!url || typeof url !== 'string') {
             return false;
         }
 
-
         try {
 
-            const valor =
-                String(url)
-                    .trim()
-                    .toLowerCase();
+            const parsed = new URL(url);
 
+            return parsed.hostname.toLowerCase() === 'api.whatsapp.com';
 
-            if (
-                valor ===
-                'api.whatsapp.com'
-            ) {
-                return true;
+        } catch (e) {
+
+            return url.toLowerCase().includes('api.whatsapp.com');
+
+        }
+
+    }
+
+    // ============================================================
+    // PERCORRE JSON RECURSIVAMENTE
+    // ============================================================
+
+    function percorrerJSON(valor, callback) {
+
+        if (!valor) return;
+
+        if (Array.isArray(valor)) {
+
+            for (const item of valor) {
+
+                percorrerJSON(item, callback);
+
             }
 
-
-            const urlObj =
-                new URL(
-                    valor.startsWith('http')
-                        ? valor
-                        : `https://${valor}`
-                );
-
-
-            return (
-                urlObj.hostname ===
-                'api.whatsapp.com'
-            );
-
-        } catch {
-
-            return String(url)
-                .toLowerCase()
-                .includes(
-                    'api.whatsapp.com'
-                );
-
+            return;
         }
 
-    }
-
-
-    // ========================================================
-    // PEGAR AD ID DO CARD
-    // ========================================================
-
-    function extrairAdId(card) {
-
-        const elemento =
-            card.querySelector(
-                '[adid]'
-            );
-
-
-        if (!elemento) {
-            return null;
+        if (typeof valor !== 'object') {
+            return;
         }
 
+        callback(valor);
 
-        const adId =
-            elemento.getAttribute(
-                'adid'
-            );
+        for (const chave in valor) {
 
-
-        return adId
-            ? String(adId).trim()
-            : null;
-
-    }
-
-
-    // ========================================================
-    // LER JSON DA ADS LIBRARY
-    // ========================================================
-
-    function obterAnunciosDoJSON() {
-
-        const anuncios =
-            new Map();
-
-
-        const scripts =
-            document.querySelectorAll(
-                'script[type="application/json"]'
-            );
-
-
-        for (
-            const script of scripts
-        ) {
-
-            const texto =
-                script.textContent;
-
-
-            if (
-                !texto ||
-                !texto.includes(
-                    'ad_archive_id'
-                )
-            ) {
+            if (!Object.prototype.hasOwnProperty.call(valor, chave)) {
                 continue;
             }
 
-
-            let json;
-
-
             try {
 
-                json =
-                    JSON.parse(
-                        texto
-                    );
-
-            } catch {
-
-                continue;
-
-            }
-
-
-            percorrerJSON(
-                json,
-                anuncios
-            );
-
-        }
-
-
-        return anuncios;
-
-    }
-
-
-    // ========================================================
-    // PERCORRER JSON RECURSIVAMENTE
-    // ========================================================
-
-    function percorrerJSON(
-        valor,
-        anuncios
-    ) {
-
-        if (!valor) {
-            return;
-        }
-
-
-        if (
-            typeof valor !==
-            'object'
-        ) {
-            return;
-        }
-
-
-        if (
-            Array.isArray(valor)
-        ) {
-
-            for (
-                const item of valor
-            ) {
-
-                percorrerJSON(
-                    item,
-                    anuncios
-                );
-
-            }
-
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // ENCONTROU UM OBJETO DE ANÚNCIO
-        // ====================================================
-
-        if (
-            valor.ad_archive_id &&
-            valor.snapshot
-        ) {
-
-            const snapshot =
-                valor.snapshot;
-
-
-            const caption =
-                typeof snapshot.caption === 'string'
-                    ? snapshot.caption.trim().toLowerCase()
-                    : '';
-
-
-            const linkUrl =
-                snapshot.link_url ||
-                '';
-
-
-            const ehWhatsapp =
-                caption ===
-                    'api.whatsapp.com' ||
-
-                ehUrlWhatsapp(
-                    linkUrl
-                );
-
-
-            if (ehWhatsapp) {
-
-                anuncios.set(
-                    String(
-                        valor.ad_archive_id
-                    ),
-                    {
-                        adId: String(
-                            valor.ad_archive_id
-                        ),
-
-                        caption,
-
-                        linkUrl,
-
-                        pageId:
-                            snapshot.page_id ||
-                            valor.page_id ||
-                            null,
-
-                        pageName:
-                            snapshot.page_name ||
-                            '',
-
-                        bodyText:
-                            snapshot.body?.text ||
-                            ''
-
-                    }
-                );
-
-            }
-
-        }
-
-
-        for (
-            const chave of Object.keys(valor)
-        ) {
-
-            try {
-
-                percorrerJSON(
-                    valor[chave],
-                    anuncios
-                );
+                percorrerJSON(valor[chave], callback);
 
             } catch (e) {}
 
@@ -2284,235 +1739,388 @@
 
     }
 
+    // ============================================================
+    // LÊ OS ANÚNCIOS DOS JSONs DA PÁGINA
+    // ============================================================
 
-    // ========================================================
-    // PEGAR IDS WHATSAPP
-    // ========================================================
+    function obterAnunciosDoJSON() {
+
+        const anuncios = new Map();
+
+        const scripts = document.querySelectorAll(
+            'script[type="application/json"]'
+        );
+
+        scripts.forEach(script => {
+
+            const texto = script.textContent || '';
+
+            if (!texto.includes('ad_archive_id')) {
+                return;
+            }
+
+            try {
+
+                const json = JSON.parse(texto);
+
+                percorrerJSON(json, function (obj) {
+
+                    if (
+                        !obj ||
+                        !obj.ad_archive_id ||
+                        !obj.snapshot
+                    ) {
+                        return;
+                    }
+
+                    const id = String(obj.ad_archive_id);
+
+                    const snapshot = obj.snapshot;
+
+                    const caption =
+                        typeof snapshot.caption === 'string'
+                            ? snapshot.caption.trim().toLowerCase()
+                            : '';
+
+                    const linkUrl =
+                        typeof snapshot.link_url === 'string'
+                            ? snapshot.link_url
+                            : '';
+
+                    /*
+                     * DETECÇÃO PRINCIPAL
+                     *
+                     * O que interessa é:
+                     *
+                     * ad_archive_id
+                     * +
+                     * snapshot.caption = api.whatsapp.com
+                     *
+                     * ou link_url apontando para api.whatsapp.com
+                     */
+
+                    const ehWhatsapp =
+                        caption === 'api.whatsapp.com' ||
+                        ehUrlWhatsapp(linkUrl);
+
+                    anuncios.set(id, {
+
+                        id: id,
+
+                        ehWhatsapp: ehWhatsapp,
+
+                        caption: caption,
+
+                        linkUrl: linkUrl
+
+                    });
+
+                });
+
+            } catch (e) {
+
+                // Alguns scripts JSON podem não ser parseáveis.
+                // Ignora e continua.
+
+            }
+
+        });
+
+        return anuncios;
+    }
+
+    // ============================================================
+    // OBTÉM IDS DOS ANÚNCIOS WHATSAPP
+    // ============================================================
 
     function obterIdsWhatsapp() {
 
-        const anuncios =
-            obterAnunciosDoJSON();
+        const anuncios = obterAnunciosDoJSON();
 
+        const ids = new Set();
 
-        return new Set(
-            anuncios.keys()
-        );
+        anuncios.forEach(anuncio => {
 
-    }
+            if (anuncio.ehWhatsapp) {
 
+                ids.add(String(anuncio.id));
 
-    // ========================================================
-    // OCULTAR CARD
-    // ========================================================
-
-    function ocultarCardWhatsapp(card) {
-
-        if (!card) {
-            return;
-        }
-
-
-        const container =
-            card.closest('.card-ad') ||
-            card;
-
-
-        if (
-            container.dataset
-                .autoWhatsappOculto === '1'
-        ) {
-            return;
-        }
-
-
-        container.dataset
-            .autoWhatsappOculto =
-            '1';
-
-
-        // Preserva o estado original.
-        if (
-            !container.dataset
-                .autoWhatsappDisplayOriginal
-        ) {
-
-            container.dataset
-                .autoWhatsappDisplayOriginal =
-                container.style.display || '';
-
-        }
-
-
-        container.style.display =
-            'none';
-
-
-        whatsappOcultos.add(
-            container
-        );
-
-
-        console.log(
-            '[FILTRO WHATSAPP] Card ocultado:',
-            extrairAdId(container)
-        );
-
-    }
-
-
-    // ========================================================
-    // DESAPLICAR FILTRO WHATSAPP
-    // ========================================================
-
-    function desaplicarFiltroWhatsapp() {
-
-        const cards =
-            findCards();
-
-
-        for (
-            const card of cards
-        ) {
-
-            const container =
-                card.closest('.card-ad') ||
-                card;
-
-
-            if (
-                container.dataset
-                    .autoWhatsappOculto !== '1'
-            ) {
-                continue;
             }
 
+        });
 
-            const displayOriginal =
-                container.dataset
-                    .autoWhatsappDisplayOriginal;
-
-
-            container.style.display =
-                displayOriginal || '';
-
-
-            delete container.dataset
-                .autoWhatsappOculto;
-
-
-            delete container.dataset
-                .autoWhatsappDisplayOriginal;
-
-
-            console.log(
-                '[FILTRO WHATSAPP] Card restaurado:',
-                extrairAdId(container)
-            );
-
-        }
-
+        return ids;
     }
 
+    // ============================================================
+    // ENCONTRA CARDS
+    // ============================================================
 
-    // ========================================================
-    // REMOVER ANÚNCIO
-    // ========================================================
-    // Esta continua sendo a função REAL do botão "Fechar".
-    // O filtro NÃO usa esta função, justamente para permitir
-    // que o filtro seja desligado depois.
-    // ========================================================
+    function findCards() {
+
+        const cards = new Set();
+
+        document
+            .querySelectorAll('.card-ad')
+            .forEach(card => cards.add(card));
+
+        document
+            .querySelectorAll('[class*="xh8yej3"]')
+            .forEach(card => {
+
+                /*
+                 * Só considera elementos que realmente parecem
+                 * conter um anúncio.
+                 */
+
+                if (
+                    card.querySelector('.card-ad') ||
+                    card.hasAttribute('adid') ||
+                    card.querySelector('[adid]')
+                ) {
+
+                    cards.add(card);
+
+                }
+
+            });
+
+        return Array.from(cards);
+    }
+
+    // ============================================================
+    // ENCONTRA CONTAINER REAL DO CARD
+    // ============================================================
+
+    function obterContainerCard(card) {
+
+        if (!card) return null;
+
+        /*
+         * Primeiro tenta o próprio card.
+         */
+        if (card.matches('.card-ad')) {
+            return card;
+        }
+
+        /*
+         * Depois tenta encontrar o .card-ad dentro dele.
+         */
+        const interno = card.querySelector('.card-ad');
+
+        if (interno) {
+            return interno;
+        }
+
+        return card;
+    }
+
+    // ============================================================
+    // REMOVE ANÚNCIO
+    // MESMA FUNÇÃO USADA PELO BOTÃO "FECHAR"
+    // ============================================================
 
     function removerAnuncio(card) {
 
-        const container =
-            card.closest('.card-ad') ||
-            card;
+        if (!card) return;
 
+        const container = obterContainerCard(card);
 
-        if (
-            container.dataset
-                .autoWhatsappRemovendo === '1'
-        ) {
+        if (!container) return;
 
+        /*
+         * Evita executar duas vezes.
+         */
+
+        if (container.dataset.autoRemovendo === '1') {
             return;
-
         }
 
+        container.dataset.autoRemovendo = '1';
 
-        container.dataset
-            .autoWhatsappRemovendo =
-            '1';
+        /*
+         * Mantém o comportamento visual do botão Fechar:
+         * primeiro desaparece e depois é removido do DOM.
+         */
 
+        container.style.transition = 'opacity 0.25s ease';
 
-        container.style.transition =
-            'opacity .15s ease';
-
-
-        container.style.opacity =
-            '0';
-
+        container.style.opacity = '0';
 
         setTimeout(() => {
 
             try {
 
-                processed.delete(
-                    card
-                );
-
-
                 container.remove();
 
-            } catch {}
+            } catch (e) {}
 
-        }, 150);
+        }, 250);
 
     }
 
+    // ============================================================
+    // EXTRAI LANDING PAGE
+    // ============================================================
 
-    // ========================================================
-    // PROCESSAR CARD
-    // ========================================================
+    function extrairLanding(card) {
 
-    function processarCard(card) {
+        if (!card) return null;
 
-        if (!card) {
+        const links = Array.from(
+            card.querySelectorAll('a[href]')
+        );
+
+        for (const a of links) {
+
+            const href = a.href;
+
+            if (!href) continue;
+
+            if (
+                href.includes('facebook.com') ||
+                href.includes('instagram.com') ||
+                href.includes('l.facebook.com') ||
+                href.includes('fb.me')
+            ) {
+                continue;
+            }
+
+            if (href.startsWith('javascript:')) {
+                continue;
+            }
+
+            return href;
+        }
+
+        return null;
+    }
+
+    // ============================================================
+    // EXTRAI PÁGINA DO ANUNCIANTE
+    // ============================================================
+
+    function extrairPagina(card) {
+
+        if (!card) return null;
+
+        const links = Array.from(
+            card.querySelectorAll('a[href]')
+        );
+
+        for (const a of links) {
+
+            const href = a.href || '';
+
+            if (
+                href.includes('facebook.com') &&
+                href.includes('/ads/library')
+            ) {
+                return href;
+            }
+
+        }
+
+        const adId = extrairAdId(card);
+
+        if (!adId) return null;
+
+        return (
+            'https://www.facebook.com/ads/library/?id=' +
+            encodeURIComponent(adId)
+        );
+
+    }
+
+    // ============================================================
+    // BOTÃO
+    // ============================================================
+
+    function criarBotao(texto, classe, callback) {
+
+        const button = document.createElement('button');
+
+        button.type = 'button';
+
+        button.className =
+            'meu-ad-btn ' + classe;
+
+        button.textContent = texto;
+
+        button.addEventListener('click', function (event) {
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            try {
+                callback();
+            } catch (e) {
+                console.error(
+                    '[AUTO ADS] Erro no botão:',
+                    e
+                );
+            }
+
+        });
+
+        return button;
+    }
+
+    // ============================================================
+    // PROCESSA CARD
+    // ============================================================
+
+    function processarCard(card, idsWhatsapp) {
+
+        if (!card) return;
+
+        if (!document.body.contains(card)) {
             return;
         }
 
+        const container = obterContainerCard(card);
 
-        // ====================================================
-        // ID DO ANÚNCIO
-        // ====================================================
+        if (!container) return;
 
-        const adId =
-            extrairAdId(card);
+        /*
+         * Se este card já está sendo removido, não mexe.
+         */
 
+        if (container.dataset.autoRemovendo === '1') {
+            return;
+        }
 
-        // ====================================================
+        // ========================================================
         // FILTRO WHATSAPP
-        // ====================================================
+        // ========================================================
 
-        if (
-            filtroWhatsappAtivo() &&
-            adId
-        ) {
+        if (filtroWhatsappAtivo()) {
 
-            const idsWhatsapp =
-                obterIdsWhatsapp();
-
+            const adId = extrairAdId(card);
 
             if (
-                idsWhatsapp.has(
-                    adId
-                )
+                adId &&
+                idsWhatsapp.has(String(adId))
             ) {
 
-                ocultarCardWhatsapp(
-                    card
-                );
+                /*
+                 * IMPORTANTE:
+                 *
+                 * Não escondemos.
+                 * Não usamos display:none.
+                 *
+                 * Chamamos exatamente a mesma função
+                 * utilizada pelo botão "Fechar".
+                 */
 
+                if (!whatsappRemovidos.has(container)) {
+
+                    whatsappRemovidos.add(container);
+
+                    removerAnuncio(container);
+
+                }
 
                 return;
 
@@ -2520,584 +2128,263 @@
 
         }
 
+        // ========================================================
+        // EVITA DUPLICAR BOTÕES
+        // ========================================================
 
-        // ====================================================
-        // SE FILTRO ESTÁ DESLIGADO
-        // RESTAURA CARD QUE FOI OCULTADO
-        // ====================================================
-
-        if (
-            !filtroWhatsappAtivo()
-        ) {
-
-            const container =
-                card.closest('.card-ad') ||
-                card;
-
-
-            if (
-                container.dataset
-                    .autoWhatsappOculto === '1'
-            ) {
-
-                const displayOriginal =
-                    container.dataset
-                        .autoWhatsappDisplayOriginal;
-
-
-                container.style.display =
-                    displayOriginal || '';
-
-
-                delete container.dataset
-                    .autoWhatsappOculto;
-
-
-                delete container.dataset
-                    .autoWhatsappDisplayOriginal;
-
-            }
-
+        if (processed.has(container)) {
+            return;
         }
 
-
-        // ====================================================
-        // PROCESSAMENTO NORMAL
-        // ====================================================
-
         if (
-            processed.has(card)
+            container.querySelector('.meu-ad-bar')
         ) {
+
+            processed.add(container);
 
             return;
-
         }
 
+        processed.add(container);
 
-        if (
-            card.querySelector(
-                '.meu-ad-bar'
-            )
-        ) {
+        // ========================================================
+        // CRIA BARRA
+        // ========================================================
 
-            processed.add(card);
+        const bar = document.createElement('div');
 
-            return;
+        bar.className = 'meu-ad-bar';
 
-        }
-
-
-        const landing =
-            extrairLanding(
-                card
-            );
-
-
-        const pagina =
-            extrairPagina(
-                card
-            );
-
-
-        const temPageId =
-
-            pagina &&
-
-            pagina.pageId &&
-
-            /^\d+$/.test(
-                pagina.pageId
-            );
-
-
-        if (
-
-            !landing &&
-
-            !temPageId
-
-        ) {
-
-            return;
-
-        }
-
-
-        const bar =
-            document.createElement(
-                'div'
-            );
-
-
-        bar.className =
-            'meu-ad-bar';
-
-
-        // ====================================================
+        // ========================================================
         // SITE
-        // ====================================================
+        // ========================================================
+
+        const landing = extrairLanding(container);
 
         if (landing) {
 
-            bar.appendChild(
+            const btnSite = criarBotao(
+                '🌐 Site',
+                'meu-ad-site',
+                function () {
 
-                criarBotao(
-                    '🌐 Site',
-                    () => {
-
-                        window.open(
-                            landing,
-                            '_blank'
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        // ====================================================
-        // ADS
-        // ====================================================
-
-        if (temPageId) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '📘 Ads',
-                    () => {
-
-                        abrirAdsLibrary(
-                            pagina.pageId
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        // ====================================================
-        // IMAGEM
-        // ====================================================
-
-        if (
-            card.querySelector(
-                'img'
-            )
-        ) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '🖼️ Imagem',
-                    () => {
-
-                        abrirImagem(
-                            card
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        // ====================================================
-        // VÍDEO
-        // ====================================================
-
-        if (
-            card.querySelector(
-                'video'
-            )
-        ) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '🎥 Vídeo',
-                    () => {
-
-                        abrirVideo(
-                            card
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        // ====================================================
-        // BOTÃO FECHAR
-        // ====================================================
-
-        const btnFechar =
-            criarBotao(
-                '❌ Fechar',
-                () => {
-
-                    if (
-                        btnFechar.dataset
-                            .confirmando === '1'
-                    ) {
-
-                        removerAnuncio(
-                            card
-                        );
-
-
-                        return;
-
-                    }
-
-
-                    btnFechar.dataset
-                        .confirmando =
-                        '1';
-
-
-                    btnFechar.textContent =
-                        '⚠️ Confirmar';
-
-
-                    setTimeout(() => {
-
-                        if (
-
-                            btnFechar.isConnected &&
-
-                            btnFechar.dataset
-                                .confirmando === '1'
-
-                        ) {
-
-                            btnFechar.dataset
-                                .confirmando =
-                                '0';
-
-
-                            btnFechar.textContent =
-                                '❌ Fechar';
-
-                        }
-
-                    }, 3000);
+                    window.open(
+                        landing,
+                        '_blank'
+                    );
 
                 }
             );
 
-
-        bar.appendChild(
-            btnFechar
-        );
-
-
-        // ====================================================
-        // INSERIR BARRA
-        // ====================================================
-
-        const patrocinadoContainer =
-            card.querySelector(
-                'div._8nrv'
-            );
-
-
-        if (
-            patrocinadoContainer
-        ) {
-
-            patrocinadoContainer
-                .insertAdjacentElement(
-                    'afterend',
-                    bar
-                );
-
-        } else {
-
-            const fallback =
-
-                card.querySelector(
-                    '.ad-ui-container'
-                ) ||
-
-                card;
-
-
-            fallback.prepend(
-                bar
-            );
+            bar.appendChild(btnSite);
 
         }
 
+        // ========================================================
+        // ADS
+        // ========================================================
 
-        processed.add(
-            card
-        );
+        const pagina = extrairPagina(container);
 
-    }
+        if (pagina) {
 
+            const btnAds = criarBotao(
+                '📢 Ads',
+                'meu-ad-ads',
+                function () {
 
-    // ========================================================
-    // ABRIR ADS LIBRARY
-    // ========================================================
-
-    function abrirAdsLibrary(pageId) {
-
-        if (!pageId) {
-
-            alert(
-                'Page ID não encontrado'
-            );
-
-            return;
-
-        }
-
-
-        const url =
-            `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&sort_data[mode]=total_impressions&sort_data[direction]=desc&view_all_page_id=${pageId}`;
-
-
-        window.open(
-            url,
-            '_blank'
-        );
-
-    }
-
-
-    // ========================================================
-    // ABRIR IMAGEM
-    // ========================================================
-
-    function abrirImagem(card) {
-
-        const imagens =
-            [...card.querySelectorAll(
-                'img'
-            )];
-
-
-        const img =
-            imagens
-                .filter(i => {
-
-                    const src =
-                        i.src || '';
-
-
-                    return (
-
-                        src.includes(
-                            'scontent'
-                        ) ||
-
-                        src.includes(
-                            'fbcdn'
-                        )
-
+                    window.open(
+                        pagina,
+                        '_blank'
                     );
 
-                })
-                .sort((a, b) =>
-                    (
-                        b.naturalWidth *
-                        b.naturalHeight
-                    ) -
-                    (
-                        a.naturalWidth *
-                        a.naturalHeight
-                    )
-                )[0];
-
-
-        if (!img) {
-
-            alert(
-                'Imagem não encontrada'
+                }
             );
 
-            return;
+            bar.appendChild(btnAds);
 
         }
 
+        // ========================================================
+        // IMAGEM
+        // ========================================================
 
-        window.open(
-            img.src,
-            '_blank'
+        const imagem = container.querySelector(
+            'img[src]'
         );
 
-    }
+        if (imagem && imagem.src) {
 
+            const btnImagem = criarBotao(
+                '🖼️ Imagem',
+                'meu-ad-img',
+                function () {
 
-    // ========================================================
-    // ABRIR VÍDEO
-    // ========================================================
+                    window.open(
+                        imagem.src,
+                        '_blank'
+                    );
 
-    function abrirVideo(card) {
-
-        const video =
-            card.querySelector(
-                'video'
+                }
             );
 
-
-        if (!video) {
-
-            alert(
-                'Vídeo não encontrado'
-            );
-
-            return;
+            bar.appendChild(btnImagem);
 
         }
 
+        // ========================================================
+        // VÍDEO
+        // ========================================================
 
-        const src =
-            video.currentSrc ||
-            video.src ||
-            video.querySelector(
-                'source'
-            )?.src;
-
-
-        if (!src) {
-
-            alert(
-                'URL do vídeo não encontrada'
-            );
-
-            return;
-
-        }
-
-
-        window.open(
-            src,
-            '_blank'
+        const video = container.querySelector(
+            'video'
         );
 
+        if (video) {
+
+            const btnVideo = criarBotao(
+                '🎬 Vídeo',
+                'meu-ad-video',
+                function () {
+
+                    const src =
+                        video.currentSrc ||
+                        video.src ||
+                        video.querySelector('source')?.src;
+
+                    if (src) {
+
+                        window.open(
+                            src,
+                            '_blank'
+                        );
+
+                    } else {
+
+                        alert(
+                            'Não foi possível encontrar a URL do vídeo.'
+                        );
+
+                    }
+
+                }
+            );
+
+            bar.appendChild(btnVideo);
+
+        }
+
+        // ========================================================
+        // FECHAR
+        // ========================================================
+
+        const btnFechar = criarBotao(
+            '❌ Fechar',
+            'meu-ad-close',
+            function () {
+
+                const primeiraConfirmacao =
+                    confirm(
+                        'Fechar este anúncio?'
+                    );
+
+                if (!primeiraConfirmacao) {
+                    return;
+                }
+
+                const segundaConfirmacao =
+                    confirm(
+                        'Tem certeza que deseja remover este anúncio?'
+                    );
+
+                if (!segundaConfirmacao) {
+                    return;
+                }
+
+                removerAnuncio(container);
+
+            }
+        );
+
+        bar.appendChild(btnFechar);
+
+        // ========================================================
+        // INSERE BARRA
+        // ========================================================
+
+        container.appendChild(bar);
+
     }
 
-
-    // ========================================================
-    // ENCONTRAR CARDS
-    // ========================================================
-
-    function findCards() {
-
-        const cards =
-            [
-                ...document.querySelectorAll(
-                    '.card-ad'
-                ),
-
-                ...document.querySelectorAll(
-                    '[class*="xh8yej3"]'
-                )
-            ];
-
-
-        return [
-            ...new Set(
-                cards
-            )
-        ];
-
-    }
-
-
-    // ========================================================
+    // ============================================================
     // SCAN
-    // ========================================================
+    // ============================================================
 
     function scan() {
 
-        const cards =
-            findCards();
+        const cards = findCards();
 
+        /*
+         * Só processa os JSONs quando o filtro está ativo.
+         *
+         * Isso evita trabalho desnecessário quando o filtro
+         * está desligado.
+         */
 
-        // Só precisamos montar o mapa uma vez por scan.
         const idsWhatsapp =
             filtroWhatsappAtivo()
                 ? obterIdsWhatsapp()
                 : new Set();
 
+        cards.forEach(card => {
 
-        for (
-            const card of cards
-        ) {
+            if (!card) return;
 
-            // ================================================
-            // FILTRO WHATSAPP
-            // ================================================
-
-            if (
-                filtroWhatsappAtivo()
-            ) {
-
-                const adId =
-                    extrairAdId(
-                        card
-                    );
-
-
-                if (
-                    adId &&
-                    idsWhatsapp.has(
-                        adId
-                    )
-                ) {
-
-                    ocultarCardWhatsapp(
-                        card
-                    );
-
-
-                    continue;
-
-                }
-
+            if (!document.body.contains(card)) {
+                return;
             }
 
-
             processarCard(
-                card
+                card,
+                idsWhatsapp
             );
 
-        }
+        });
 
     }
 
+    // ============================================================
+    // MUTATION OBSERVER
+    // ============================================================
 
-    // ========================================================
+    const observer =
+        new MutationObserver(function () {
+
+            clearTimeout(scanTimeout);
+
+            scanTimeout = setTimeout(
+                function () {
+
+                    scan();
+
+                },
+                300
+            );
+
+        });
+
+    // ============================================================
     // START
-    // ========================================================
+    // ============================================================
 
     function start() {
 
         injectCSS();
 
-        criarPainelFiltro();
-
-
-        // ====================================================
-        // IMPORTANTE:
-        // NÃO ATIVA O FILTRO AUTOMATICAMENTE.
-        //
-        // Se nunca foi configurado, começa desligado.
-        // ====================================================
+        /*
+         * Se ainda não existe configuração,
+         * começa DESLIGADO.
+         */
 
         if (
             localStorage.getItem(
@@ -3112,51 +2399,19 @@
 
         }
 
+        criarPainelFiltro();
 
+        // Scan imediato
         scan();
 
+        // Alguns anúncios/JSONs aparecem depois
+        setTimeout(scan, 1000);
 
-        setTimeout(
-            scan,
-            1000
-        );
+        setTimeout(scan, 2500);
 
+        setTimeout(scan, 5000);
 
-        setTimeout(
-            scan,
-            2500
-        );
-
-
-        setTimeout(
-            scan,
-            5000
-        );
-
-
-        const observer =
-            new MutationObserver(
-                () => {
-
-                    clearTimeout(
-                        scanTimeout
-                    );
-
-
-                    scanTimeout =
-                        setTimeout(
-                            () => {
-
-                                scan();
-
-                            },
-                            300
-                        );
-
-                }
-            );
-
-
+        // Observa novos anúncios carregados
         observer.observe(
             document.body,
             {
@@ -3165,26 +2420,46 @@
             }
         );
 
-
-        // ====================================================
-        // LIMPEZA PARA PRÓXIMA EXECUÇÃO DO USERSCRIPT
-        // ====================================================
-
-        window.__AUTO_WHATSAPP_FILTER_CLEANUP =
-            () => {
-
-                try {
-                    observer.disconnect();
-                } catch {}
-
-                clearTimeout(
-                    scanTimeout
-                );
-
-            };
-
     }
 
+    // ============================================================
+    // CLEANUP
+    // ============================================================
+
+    window.__AUTO_WHATSAPP_FILTER_CLEANUP =
+        function () {
+
+            try {
+
+                observer.disconnect();
+
+            } catch (e) {}
+
+            clearTimeout(scanTimeout);
+
+            const panel =
+                document.getElementById(
+                    'auto-whatsapp-panel'
+                );
+
+            if (panel) {
+                panel.remove();
+            }
+
+            const style =
+                document.getElementById(
+                    'auto-whatsapp-style'
+                );
+
+            if (style) {
+                style.remove();
+            }
+
+        };
+
+    // ============================================================
+    // EXECUTA
+    // ============================================================
 
     start();
 
