@@ -1358,10 +1358,31 @@
     'use strict';
 
 
+    // ========================================================
+    // LIMPA INSTALAÇÃO ANTERIOR
+    // ========================================================
+
+    if (window.__AUTO_WHATSAPP_FILTER_CLEANUP) {
+
+        try {
+            window.__AUTO_WHATSAPP_FILTER_CLEANUP();
+        } catch (e) {}
+
+    }
+
+
     const processed =
         new WeakSet();
 
-    let scanTimeout;
+
+    let scanTimeout =
+        null;
+
+
+    // Guarda os cards que foram ocultados pelo filtro.
+    // Isso permite DESAPLICAR o filtro depois.
+    const whatsappOcultos =
+        new WeakSet();
 
 
     // ========================================================
@@ -1613,25 +1634,31 @@
 
 
                 // ============================================
-                // ATIVOU O FILTRO
+                // ATIVOU
                 // ============================================
 
                 if (
                     novoEstado === '1'
                 ) {
 
-                    /*
-                     * Faz uma varredura IMEDIATA nos cards
-                     * que já estão carregados na página.
-                     */
-
                     scan();
+
 
                     alert(
                         'Filtro WhatsApp ATIVADO'
                     );
 
-                } else {
+                }
+
+
+                // ============================================
+                // DESATIVOU
+                // ============================================
+
+                else {
+
+                    desaplicarFiltroWhatsapp();
+
 
                     alert(
                         'Filtro WhatsApp DESATIVADO'
@@ -1992,82 +2019,831 @@
         }
 
 
-        return String(url)
-            .toLowerCase()
-            .includes(
+        try {
+
+            const valor =
+                String(url)
+                    .trim()
+                    .toLowerCase();
+
+
+            if (
+                valor ===
+                'api.whatsapp.com'
+            ) {
+                return true;
+            }
+
+
+            const urlObj =
+                new URL(
+                    valor.startsWith('http')
+                        ? valor
+                        : `https://${valor}`
+                );
+
+
+            return (
+                urlObj.hostname ===
                 'api.whatsapp.com'
             );
+
+        } catch {
+
+            return String(url)
+                .toLowerCase()
+                .includes(
+                    'api.whatsapp.com'
+                );
+
+        }
 
     }
 
 
     // ========================================================
-    // DETECTAR URL DE EXIBIÇÃO NO CARD
+    // PEGAR AD ID DO CARD
     // ========================================================
 
-    function cardTemUrlWhatsapp(card) {
+    function extrairAdId(card) {
 
-        /*
-         * A URL de exibição normalmente aparece
-         * como texto dentro do próprio card.
-         *
-         * Por isso verificamos o texto completo
-         * do anúncio.
-         */
-
-        const texto =
-            (
-
-                card.innerText ||
-
-                card.textContent ||
-
-                ''
-
-            )
-            .toLowerCase();
+        const elemento =
+            card.querySelector(
+                '[adid]'
+            );
 
 
-        if (
-            texto.includes(
-                'api.whatsapp.com'
-            )
-        ) {
-
-            return true;
-
+        if (!elemento) {
+            return null;
         }
 
 
-        /*
-         * Também verificamos os hrefs presentes
-         * dentro do card como fallback.
-         */
+        const adId =
+            elemento.getAttribute(
+                'adid'
+            );
 
-        const links =
-            card.querySelectorAll(
-                'a[href]'
+
+        return adId
+            ? String(adId).trim()
+            : null;
+
+    }
+
+
+    // ========================================================
+    // LER JSON DA ADS LIBRARY
+    // ========================================================
+
+    function obterAnunciosDoJSON() {
+
+        const anuncios =
+            new Map();
+
+
+        const scripts =
+            document.querySelectorAll(
+                'script[type="application/json"]'
             );
 
 
         for (
-            const link of links
+            const script of scripts
         ) {
 
+            const texto =
+                script.textContent;
+
+
             if (
-                ehUrlWhatsapp(
-                    link.href
+                !texto ||
+                !texto.includes(
+                    'ad_archive_id'
                 )
             ) {
+                continue;
+            }
 
-                return true;
+
+            let json;
+
+
+            try {
+
+                json =
+                    JSON.parse(
+                        texto
+                    );
+
+            } catch {
+
+                continue;
+
+            }
+
+
+            percorrerJSON(
+                json,
+                anuncios
+            );
+
+        }
+
+
+        return anuncios;
+
+    }
+
+
+    // ========================================================
+    // PERCORRER JSON RECURSIVAMENTE
+    // ========================================================
+
+    function percorrerJSON(
+        valor,
+        anuncios
+    ) {
+
+        if (!valor) {
+            return;
+        }
+
+
+        if (
+            typeof valor !==
+            'object'
+        ) {
+            return;
+        }
+
+
+        if (
+            Array.isArray(valor)
+        ) {
+
+            for (
+                const item of valor
+            ) {
+
+                percorrerJSON(
+                    item,
+                    anuncios
+                );
+
+            }
+
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // ENCONTROU UM OBJETO DE ANÚNCIO
+        // ====================================================
+
+        if (
+            valor.ad_archive_id &&
+            valor.snapshot
+        ) {
+
+            const snapshot =
+                valor.snapshot;
+
+
+            const caption =
+                typeof snapshot.caption === 'string'
+                    ? snapshot.caption.trim().toLowerCase()
+                    : '';
+
+
+            const linkUrl =
+                snapshot.link_url ||
+                '';
+
+
+            const ehWhatsapp =
+                caption ===
+                    'api.whatsapp.com' ||
+
+                ehUrlWhatsapp(
+                    linkUrl
+                );
+
+
+            if (ehWhatsapp) {
+
+                anuncios.set(
+                    String(
+                        valor.ad_archive_id
+                    ),
+                    {
+                        adId: String(
+                            valor.ad_archive_id
+                        ),
+
+                        caption,
+
+                        linkUrl,
+
+                        pageId:
+                            snapshot.page_id ||
+                            valor.page_id ||
+                            null,
+
+                        pageName:
+                            snapshot.page_name ||
+                            '',
+
+                        bodyText:
+                            snapshot.body?.text ||
+                            ''
+
+                    }
+                );
 
             }
 
         }
 
 
-        return false;
+        for (
+            const chave of Object.keys(valor)
+        ) {
+
+            try {
+
+                percorrerJSON(
+                    valor[chave],
+                    anuncios
+                );
+
+            } catch (e) {}
+
+        }
+
+    }
+
+
+    // ========================================================
+    // PEGAR IDS WHATSAPP
+    // ========================================================
+
+    function obterIdsWhatsapp() {
+
+        const anuncios =
+            obterAnunciosDoJSON();
+
+
+        return new Set(
+            anuncios.keys()
+        );
+
+    }
+
+
+    // ========================================================
+    // OCULTAR CARD
+    // ========================================================
+
+    function ocultarCardWhatsapp(card) {
+
+        if (!card) {
+            return;
+        }
+
+
+        const container =
+            card.closest('.card-ad') ||
+            card;
+
+
+        if (
+            container.dataset
+                .autoWhatsappOculto === '1'
+        ) {
+            return;
+        }
+
+
+        container.dataset
+            .autoWhatsappOculto =
+            '1';
+
+
+        // Preserva o estado original.
+        if (
+            !container.dataset
+                .autoWhatsappDisplayOriginal
+        ) {
+
+            container.dataset
+                .autoWhatsappDisplayOriginal =
+                container.style.display || '';
+
+        }
+
+
+        container.style.display =
+            'none';
+
+
+        whatsappOcultos.add(
+            container
+        );
+
+
+        console.log(
+            '[FILTRO WHATSAPP] Card ocultado:',
+            extrairAdId(container)
+        );
+
+    }
+
+
+    // ========================================================
+    // DESAPLICAR FILTRO WHATSAPP
+    // ========================================================
+
+    function desaplicarFiltroWhatsapp() {
+
+        const cards =
+            findCards();
+
+
+        for (
+            const card of cards
+        ) {
+
+            const container =
+                card.closest('.card-ad') ||
+                card;
+
+
+            if (
+                container.dataset
+                    .autoWhatsappOculto !== '1'
+            ) {
+                continue;
+            }
+
+
+            const displayOriginal =
+                container.dataset
+                    .autoWhatsappDisplayOriginal;
+
+
+            container.style.display =
+                displayOriginal || '';
+
+
+            delete container.dataset
+                .autoWhatsappOculto;
+
+
+            delete container.dataset
+                .autoWhatsappDisplayOriginal;
+
+
+            console.log(
+                '[FILTRO WHATSAPP] Card restaurado:',
+                extrairAdId(container)
+            );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // REMOVER ANÚNCIO
+    // ========================================================
+    // Esta continua sendo a função REAL do botão "Fechar".
+    // O filtro NÃO usa esta função, justamente para permitir
+    // que o filtro seja desligado depois.
+    // ========================================================
+
+    function removerAnuncio(card) {
+
+        const container =
+            card.closest('.card-ad') ||
+            card;
+
+
+        if (
+            container.dataset
+                .autoWhatsappRemovendo === '1'
+        ) {
+
+            return;
+
+        }
+
+
+        container.dataset
+            .autoWhatsappRemovendo =
+            '1';
+
+
+        container.style.transition =
+            'opacity .15s ease';
+
+
+        container.style.opacity =
+            '0';
+
+
+        setTimeout(() => {
+
+            try {
+
+                processed.delete(
+                    card
+                );
+
+
+                container.remove();
+
+            } catch {}
+
+        }, 150);
+
+    }
+
+
+    // ========================================================
+    // PROCESSAR CARD
+    // ========================================================
+
+    function processarCard(card) {
+
+        if (!card) {
+            return;
+        }
+
+
+        // ====================================================
+        // ID DO ANÚNCIO
+        // ====================================================
+
+        const adId =
+            extrairAdId(card);
+
+
+        // ====================================================
+        // FILTRO WHATSAPP
+        // ====================================================
+
+        if (
+            filtroWhatsappAtivo() &&
+            adId
+        ) {
+
+            const idsWhatsapp =
+                obterIdsWhatsapp();
+
+
+            if (
+                idsWhatsapp.has(
+                    adId
+                )
+            ) {
+
+                ocultarCardWhatsapp(
+                    card
+                );
+
+
+                return;
+
+            }
+
+        }
+
+
+        // ====================================================
+        // SE FILTRO ESTÁ DESLIGADO
+        // RESTAURA CARD QUE FOI OCULTADO
+        // ====================================================
+
+        if (
+            !filtroWhatsappAtivo()
+        ) {
+
+            const container =
+                card.closest('.card-ad') ||
+                card;
+
+
+            if (
+                container.dataset
+                    .autoWhatsappOculto === '1'
+            ) {
+
+                const displayOriginal =
+                    container.dataset
+                        .autoWhatsappDisplayOriginal;
+
+
+                container.style.display =
+                    displayOriginal || '';
+
+
+                delete container.dataset
+                    .autoWhatsappOculto;
+
+
+                delete container.dataset
+                    .autoWhatsappDisplayOriginal;
+
+            }
+
+        }
+
+
+        // ====================================================
+        // PROCESSAMENTO NORMAL
+        // ====================================================
+
+        if (
+            processed.has(card)
+        ) {
+
+            return;
+
+        }
+
+
+        if (
+            card.querySelector(
+                '.meu-ad-bar'
+            )
+        ) {
+
+            processed.add(card);
+
+            return;
+
+        }
+
+
+        const landing =
+            extrairLanding(
+                card
+            );
+
+
+        const pagina =
+            extrairPagina(
+                card
+            );
+
+
+        const temPageId =
+
+            pagina &&
+
+            pagina.pageId &&
+
+            /^\d+$/.test(
+                pagina.pageId
+            );
+
+
+        if (
+
+            !landing &&
+
+            !temPageId
+
+        ) {
+
+            return;
+
+        }
+
+
+        const bar =
+            document.createElement(
+                'div'
+            );
+
+
+        bar.className =
+            'meu-ad-bar';
+
+
+        // ====================================================
+        // SITE
+        // ====================================================
+
+        if (landing) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🌐 Site',
+                    () => {
+
+                        window.open(
+                            landing,
+                            '_blank'
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        // ====================================================
+        // ADS
+        // ====================================================
+
+        if (temPageId) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '📘 Ads',
+                    () => {
+
+                        abrirAdsLibrary(
+                            pagina.pageId
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        // ====================================================
+        // IMAGEM
+        // ====================================================
+
+        if (
+            card.querySelector(
+                'img'
+            )
+        ) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🖼️ Imagem',
+                    () => {
+
+                        abrirImagem(
+                            card
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        // ====================================================
+        // VÍDEO
+        // ====================================================
+
+        if (
+            card.querySelector(
+                'video'
+            )
+        ) {
+
+            bar.appendChild(
+
+                criarBotao(
+                    '🎥 Vídeo',
+                    () => {
+
+                        abrirVideo(
+                            card
+                        );
+
+                    }
+                )
+
+            );
+
+        }
+
+
+        // ====================================================
+        // BOTÃO FECHAR
+        // ====================================================
+
+        const btnFechar =
+            criarBotao(
+                '❌ Fechar',
+                () => {
+
+                    if (
+                        btnFechar.dataset
+                            .confirmando === '1'
+                    ) {
+
+                        removerAnuncio(
+                            card
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    btnFechar.dataset
+                        .confirmando =
+                        '1';
+
+
+                    btnFechar.textContent =
+                        '⚠️ Confirmar';
+
+
+                    setTimeout(() => {
+
+                        if (
+
+                            btnFechar.isConnected &&
+
+                            btnFechar.dataset
+                                .confirmando === '1'
+
+                        ) {
+
+                            btnFechar.dataset
+                                .confirmando =
+                                '0';
+
+
+                            btnFechar.textContent =
+                                '❌ Fechar';
+
+                        }
+
+                    }, 3000);
+
+                }
+            );
+
+
+        bar.appendChild(
+            btnFechar
+        );
+
+
+        // ====================================================
+        // INSERIR BARRA
+        // ====================================================
+
+        const patrocinadoContainer =
+            card.querySelector(
+                'div._8nrv'
+            );
+
+
+        if (
+            patrocinadoContainer
+        ) {
+
+            patrocinadoContainer
+                .insertAdjacentElement(
+                    'afterend',
+                    bar
+                );
+
+        } else {
+
+            const fallback =
+
+                card.querySelector(
+                    '.ad-ui-container'
+                ) ||
+
+                card;
+
+
+            fallback.prepend(
+                bar
+            );
+
+        }
+
+
+        processed.add(
+            card
+        );
 
     }
 
@@ -2085,6 +2861,7 @@
             );
 
             return;
+
         }
 
 
@@ -2152,6 +2929,7 @@
             );
 
             return;
+
         }
 
 
@@ -2182,6 +2960,7 @@
             );
 
             return;
+
         }
 
 
@@ -2200,6 +2979,7 @@
             );
 
             return;
+
         }
 
 
@@ -2212,397 +2992,27 @@
 
 
     // ========================================================
-    // REMOVER ANÚNCIO
-    // ========================================================
-
-    function removerAnuncio(card) {
-
-        const container =
-            card.closest('.card-ad') ||
-            card;
-
-
-        /*
-         * Evita tentar fechar o mesmo card várias vezes.
-         */
-
-        if (
-            container.dataset.autoWhatsappRemovendo === '1'
-        ) {
-
-            return;
-
-        }
-
-
-        container.dataset.autoWhatsappRemovendo =
-            '1';
-
-
-        container.style.transition =
-            'opacity .15s ease';
-
-
-        container.style.opacity =
-            '0';
-
-
-        setTimeout(() => {
-
-            try {
-
-                processed.delete(
-                    card
-                );
-
-                container.remove();
-
-            } catch {}
-
-        }, 150);
-
-    }
-
-
-    // ========================================================
-    // PROCESSAR CARD
-    // ========================================================
-
-    function processarCard(card) {
-
-        // ====================================================
-        // FILTRO WHATSAPP
-        // ====================================================
-
-        if (
-
-            filtroWhatsappAtivo() &&
-
-            cardTemUrlWhatsapp(card)
-
-        ) {
-
-            /*
-             * Executa a mesma função utilizada
-             * pelo botão "❌ Fechar".
-             */
-
-            removerAnuncio(
-                card
-            );
-
-
-            console.log(
-                '[FILTRO WHATSAPP] Card removido:',
-                card
-            );
-
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // PROCESSAMENTO NORMAL
-        // ====================================================
-
-        if (
-            processed.has(card)
-        ) {
-
-            return;
-
-        }
-
-
-        if (
-            card.querySelector(
-                '.meu-ad-bar'
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const landing =
-            extrairLanding(
-                card
-            );
-
-
-        const pagina =
-            extrairPagina(
-                card
-            );
-
-
-        /*
-         * Se a landing page for diretamente
-         * api.whatsapp.com, também remove.
-         */
-
-        if (
-
-            filtroWhatsappAtivo() &&
-
-            ehUrlWhatsapp(
-                landing
-            )
-
-        ) {
-
-            removerAnuncio(
-                card
-            );
-
-            return;
-
-        }
-
-
-        const temPageId =
-
-            pagina &&
-
-            pagina.pageId &&
-
-            /^\d+$/.test(
-                pagina.pageId
-            );
-
-
-        if (
-
-            !landing &&
-
-            !temPageId
-
-        ) {
-
-            return;
-
-        }
-
-
-        const bar =
-            document.createElement(
-                'div'
-            );
-
-
-        bar.className =
-            'meu-ad-bar';
-
-
-        if (landing) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '🌐 Site',
-                    () => {
-
-                        window.open(
-                            landing,
-                            '_blank'
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        if (temPageId) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '📘 Ads',
-                    () => {
-
-                        abrirAdsLibrary(
-                            pagina.pageId
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        if (
-            card.querySelector(
-                'img'
-            )
-        ) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '🖼️ Imagem',
-                    () => {
-
-                        abrirImagem(
-                            card
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        if (
-            card.querySelector(
-                'video'
-            )
-        ) {
-
-            bar.appendChild(
-
-                criarBotao(
-                    '🎥 Vídeo',
-                    () => {
-
-                        abrirVideo(
-                            card
-                        );
-
-                    }
-                )
-
-            );
-
-        }
-
-
-        // ====================================================
-        // BOTÃO FECHAR
-        // ====================================================
-
-        const btnFechar =
-            criarBotao(
-                '❌ Fechar',
-                () => {
-
-                    if (
-                        btnFechar.dataset.confirmando === '1'
-                    ) {
-
-                        removerAnuncio(
-                            card
-                        );
-
-                        return;
-
-                    }
-
-
-                    btnFechar.dataset.confirmando =
-                        '1';
-
-
-                    btnFechar.textContent =
-                        '⚠️ Confirmar';
-
-
-                    setTimeout(() => {
-
-                        if (
-
-                            btnFechar.isConnected &&
-
-                            btnFechar.dataset.confirmando === '1'
-
-                        ) {
-
-                            btnFechar.dataset.confirmando =
-                                '0';
-
-
-                            btnFechar.textContent =
-                                '❌ Fechar';
-
-                        }
-
-                    }, 3000);
-
-                }
-            );
-
-
-        bar.appendChild(
-            btnFechar
-        );
-
-
-        const patrocinadoContainer =
-            card.querySelector(
-                'div._8nrv'
-            );
-
-
-        if (
-            patrocinadoContainer
-        ) {
-
-            patrocinadoContainer
-                .insertAdjacentElement(
-                    'afterend',
-                    bar
-                );
-
-        } else {
-
-            const fallback =
-
-                card.querySelector(
-                    '.ad-ui-container'
-                ) ||
-
-                card;
-
-
-            fallback.prepend(
-                bar
-            );
-
-        }
-
-
-        processed.add(
-            card
-        );
-
-    }
-
-
-    // ========================================================
     // ENCONTRAR CARDS
     // ========================================================
 
     function findCards() {
 
+        const cards =
+            [
+                ...document.querySelectorAll(
+                    '.card-ad'
+                ),
+
+                ...document.querySelectorAll(
+                    '[class*="xh8yej3"]'
+                )
+            ];
+
+
         return [
-
-            ...document.querySelectorAll(
-                '.card-ad'
-            ),
-
-            ...document.querySelectorAll(
-                '[class*="xh8yej3"]'
+            ...new Set(
+                cards
             )
-
         ];
 
     }
@@ -2618,9 +3028,49 @@
             findCards();
 
 
+        // Só precisamos montar o mapa uma vez por scan.
+        const idsWhatsapp =
+            filtroWhatsappAtivo()
+                ? obterIdsWhatsapp()
+                : new Set();
+
+
         for (
             const card of cards
         ) {
+
+            // ================================================
+            // FILTRO WHATSAPP
+            // ================================================
+
+            if (
+                filtroWhatsappAtivo()
+            ) {
+
+                const adId =
+                    extrairAdId(
+                        card
+                    );
+
+
+                if (
+                    adId &&
+                    idsWhatsapp.has(
+                        adId
+                    )
+                ) {
+
+                    ocultarCardWhatsapp(
+                        card
+                    );
+
+
+                    continue;
+
+                }
+
+            }
+
 
             processarCard(
                 card
@@ -2640,6 +3090,28 @@
         injectCSS();
 
         criarPainelFiltro();
+
+
+        // ====================================================
+        // IMPORTANTE:
+        // NÃO ATIVA O FILTRO AUTOMATICAMENTE.
+        //
+        // Se nunca foi configurado, começa desligado.
+        // ====================================================
+
+        if (
+            localStorage.getItem(
+                'meuFiltroWhatsapp'
+            ) === null
+        ) {
+
+            localStorage.setItem(
+                'meuFiltroWhatsapp',
+                '0'
+            );
+
+        }
+
 
         scan();
 
@@ -2693,14 +3165,30 @@
             }
         );
 
+
+        // ====================================================
+        // LIMPEZA PARA PRÓXIMA EXECUÇÃO DO USERSCRIPT
+        // ====================================================
+
+        window.__AUTO_WHATSAPP_FILTER_CLEANUP =
+            () => {
+
+                try {
+                    observer.disconnect();
+                } catch {}
+
+                clearTimeout(
+                    scanTimeout
+                );
+
+            };
+
     }
 
 
     start();
 
-})();
-
-
+})(); 
 // ============================================================
 // SCRIPT 03
 // OTIMIZAR RAM
